@@ -92,7 +92,7 @@ def read_logs(event):
             aws_secret_access_key=credentials['SecretAccessKey'],
             aws_session_token=credentials['SessionToken'],
         )
-    log_group_name = f'/infraweave/{region}/{environment}'
+    log_group_name = f'/infraweave/{region}/{environment}/runner'
     log_stream_name = f'ecs/runner/{job_id}'
     response_dict = logs.get_log_events(
         logGroupName=log_group_name,
