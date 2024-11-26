@@ -82,7 +82,7 @@ def read_logs(event):
     else:
         sts_client = boto3.client('sts')
         assumed_role = sts_client.assume_role(
-            RoleArn=f'arn:aws:iam::{project_id}:role/infraweave_api_read_log-{region}',
+            RoleArn=f'arn:aws:iam::{project_id}:role/infraweave_api_read_log-{region}-{environment}',
             RoleSessionName='CentralApiAssumeRoleSession'
         )
         credentials = assumed_role['Credentials']
