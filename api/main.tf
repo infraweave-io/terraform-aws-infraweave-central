@@ -24,7 +24,7 @@ resource "aws_lambda_function" "api" {
       REGION                             = var.region
       ENVIRONMENT                        = var.environment
       ECS_CLUSTER_NAME                   = "terraform-ecs-cluster"
-      ECS_TASK_DEFINITION                = "terraform-task"
+      ECS_TASK_DEFINITION                = "terraform-task-${var.environment}"
       SUBNET_ID                          = var.subnet_id
       SECURITY_GROUP_ID                  = var.security_group_id
       CENTRAL_ACCOUNT_ID                 = var.central_account_id
