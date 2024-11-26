@@ -94,7 +94,7 @@ resource "aws_dynamodb_resource_policy" "events" {
             "aws:PrincipalOrgID" = local.organization_id,
           },
           ArnLike = {
-            "aws:PrincipalArn" = "arn:aws:iam::*:role/infraweave_api_role-${var.region}"
+            "aws:PrincipalArn" = "arn:aws:iam::*:role/infraweave_api_role-${var.region}-${var.environment}"
           }
           "ForAllValues:StringLike" = {
             "dynamodb:LeadingKeys" = [
@@ -122,7 +122,7 @@ resource "aws_dynamodb_resource_policy" "events" {
             "aws:PrincipalOrgID" = local.organization_id,
           },
           ArnLike = {
-            "aws:PrincipalArn" = "arn:aws:iam::${local.central_account_id}:role/infraweave_api_role-${var.region}"
+            "aws:PrincipalArn" = "arn:aws:iam::${local.central_account_id}:role/infraweave_api_role-${var.region}-${var.environment}"
           }
           # StringLike = {
           #   "dynamodb:LeadingKeys" = "$${aws:PrincipalAccount}*"
@@ -185,7 +185,7 @@ resource "aws_dynamodb_resource_policy" "modules" {
             "aws:PrincipalOrgID" = local.organization_id,
           },
           ArnLike = {
-            "aws:PrincipalArn" = "arn:aws:iam::${local.central_account_id}:role/infraweave_api_role-${var.region}"
+            "aws:PrincipalArn" = "arn:aws:iam::${local.central_account_id}:role/infraweave_api_role-${var.region}-${var.environment}"
           }
           # StringLike = {
           #   "dynamodb:LeadingKeys" = "$${aws:PrincipalAccount}*"
@@ -208,7 +208,7 @@ resource "aws_dynamodb_resource_policy" "modules" {
             "aws:PrincipalOrgID" = local.organization_id,
           },
           ArnLike = {
-            "aws:PrincipalArn" = "arn:aws:iam::*:role/infraweave_api_role-${var.region}"
+            "aws:PrincipalArn" = "arn:aws:iam::*:role/infraweave_api_role-${var.region}-${var.environment}"
           }
           # StringLike = {
           #   "dynamodb:LeadingKeys" = "$${aws:PrincipalAccount}*"
@@ -271,7 +271,7 @@ resource "aws_dynamodb_resource_policy" "policies" {
             "aws:PrincipalOrgID" = local.organization_id,
           },
           ArnLike = {
-            "aws:PrincipalArn" = "arn:aws:iam::${local.central_account_id}:role/infraweave_api_role-${var.region}"
+            "aws:PrincipalArn" = "arn:aws:iam::${local.central_account_id}:role/infraweave_api_role-${var.region}-${var.environment}"
           }
           # StringLike = {
           #   "dynamodb:LeadingKeys" = "$${aws:PrincipalAccount}*"
@@ -294,7 +294,7 @@ resource "aws_dynamodb_resource_policy" "policies" {
             "aws:PrincipalOrgID" = local.organization_id,
           },
           ArnLike = {
-            "aws:PrincipalArn" = "arn:aws:iam::*:role/infraweave_api_role-${var.region}"
+            "aws:PrincipalArn" = "arn:aws:iam::*:role/infraweave_api_role-${var.region}-${var.environment}"
           }
           # StringLike = {
           #   "dynamodb:LeadingKeys" = "$${aws:PrincipalAccount}*"
@@ -351,7 +351,7 @@ resource "aws_dynamodb_resource_policy" "change_records" {
             "aws:PrincipalOrgID" = local.organization_id,
           },
           ArnLike = {
-            "aws:PrincipalArn" = "arn:aws:iam::*:role/infraweave_api_role-${var.region}"
+            "aws:PrincipalArn" = "arn:aws:iam::*:role/infraweave_api_role-${var.region}-${var.environment}"
           }
           "ForAllValues:StringLike" = {
             "dynamodb:LeadingKeys" = [
@@ -484,7 +484,7 @@ resource "aws_dynamodb_resource_policy" "deployments" {
             "aws:PrincipalOrgID" = local.organization_id,
           },
           ArnLike = {
-            "aws:PrincipalArn" = "arn:aws:iam::*:role/infraweave_api_role-${var.region}"
+            "aws:PrincipalArn" = "arn:aws:iam::*:role/infraweave_api_role-${var.region}-${var.environment}"
           }
           "ForAllValues:StringLike" = {
             "dynamodb:LeadingKeys" = [
@@ -523,7 +523,7 @@ resource "aws_dynamodb_resource_policy" "deployments" {
             "aws:PrincipalOrgID" = local.organization_id,
           },
           ArnLike = {
-            "aws:PrincipalArn" = "arn:aws:iam::${local.central_account_id}:role/infraweave_api_role-${var.region}"
+            "aws:PrincipalArn" = "arn:aws:iam::${local.central_account_id}:role/infraweave_api_role-${var.region}-${var.environment}"
           }
           "ForAllValues:StringLike" = {
             "dynamodb:LeadingKeys" = [
@@ -562,7 +562,7 @@ resource "aws_dynamodb_resource_policy" "deployments" {
             "aws:PrincipalOrgID" = local.organization_id,
           },
           ArnLike = {
-            "aws:PrincipalArn" = "arn:aws:iam::${local.central_account_id}:role/infraweave_api_role-${var.region}"
+            "aws:PrincipalArn" = "arn:aws:iam::${local.central_account_id}:role/infraweave_api_role-${var.region}-${var.environment}"
           }
           "ForAllValues:StringLike" = {
             "dynamodb:LeadingKeys" = [
@@ -614,7 +614,7 @@ resource "aws_s3_bucket_policy" "modules_bucket" {
             "aws:PrincipalOrgID" = local.organization_id
           },
           ArnLike = {
-            "aws:PrincipalArn" = "arn:aws:iam::*:role/infraweave_api_role-${var.region}"
+            "aws:PrincipalArn" = "arn:aws:iam::*:role/infraweave_api_role-${var.region}-${var.environment}"
           }
         }
       },
@@ -637,7 +637,7 @@ resource "aws_s3_bucket_policy" "modules_bucket" {
             "aws:PrincipalOrgID" = local.organization_id
           },
           ArnLike = {
-            "aws:PrincipalArn" = "arn:aws:iam::${local.central_account_id}:role/infraweave_api_role-${var.region}"
+            "aws:PrincipalArn" = "arn:aws:iam::${local.central_account_id}:role/infraweave_api_role-${var.region}-${var.environment}"
           }
         }
       }
@@ -682,7 +682,7 @@ resource "aws_s3_bucket_policy" "policies_bucket" {
             "aws:PrincipalOrgID" = local.organization_id
           },
           ArnLike = {
-            "aws:PrincipalArn" = "arn:aws:iam::*:role/infraweave_api_role-${var.region}"
+            "aws:PrincipalArn" = "arn:aws:iam::*:role/infraweave_api_role-${var.region}-${var.environment}"
           }
         }
       },
@@ -705,7 +705,7 @@ resource "aws_s3_bucket_policy" "policies_bucket" {
             "aws:PrincipalOrgID" = local.organization_id
           },
           ArnLike = {
-            "aws:PrincipalArn" = "arn:aws:iam::${local.central_account_id}:role/infraweave_api_role-${var.region}"
+            "aws:PrincipalArn" = "arn:aws:iam::${local.central_account_id}:role/infraweave_api_role-${var.region}-${var.environment}"
           }
         }
       }
@@ -749,7 +749,7 @@ resource "aws_s3_bucket_policy" "change_records_bucket" {
             "aws:PrincipalOrgID" = local.organization_id
           },
           ArnLike = {
-            "aws:PrincipalArn" = "arn:aws:iam::*:role/infraweave_api_role-${var.region}"
+            "aws:PrincipalArn" = "arn:aws:iam::*:role/infraweave_api_role-${var.region}-${var.environment}"
           }
         }
       }
@@ -980,7 +980,7 @@ resource "aws_dynamodb_resource_policy" "terraform_locks" {
 
 
 resource "aws_iam_policy" "user_lambda_policy" {
-  name        = "infraweave_api_user_policy-${var.region}"
+  name        = "infraweave_api_user_policy-${var.region}-${var.environment}"
   description = "IAM policy to use api lambda"
   policy      = data.aws_iam_policy_document.user_lambda_policy_document.json
 }
