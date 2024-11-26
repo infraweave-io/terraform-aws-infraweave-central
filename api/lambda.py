@@ -92,8 +92,8 @@ def read_logs(event):
             aws_secret_access_key=credentials['SecretAccessKey'],
             aws_session_token=credentials['SessionToken'],
         )
-    log_group_name = '/ecs/terraform'
-    log_stream_name = f'ecs/terraform-docker/{job_id}'
+    log_group_name = f'/infraweave/{region}/{environment}'
+    log_stream_name = f'ecs/runner/{job_id}'
     response_dict = logs.get_log_events(
         logGroupName=log_group_name,
         logStreamName=log_stream_name,
@@ -137,7 +137,7 @@ def start_runner(event):
         launchType='FARGATE',
         overrides={
             'containerOverrides': [{
-                'name': 'terraform-docker',
+                'name': 'runner',
                 'environment': [
                     {
                         "name": "PAYLOAD",
