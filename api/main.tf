@@ -24,10 +24,6 @@ resource "aws_lambda_function" "api" {
       CHANGE_RECORD_S3_BUCKET           = var.change_records_s3_bucket
       REGION                             = var.region
       ENVIRONMENT                        = var.environment
-      ECS_CLUSTER_NAME                   = "terraform-ecs-cluster"
-      ECS_TASK_DEFINITION                = "terraform-task-${var.environment}"
-      SUBNET_ID                          = var.subnet_id
-      SECURITY_GROUP_ID                  = var.security_group_id
       CENTRAL_ACCOUNT_ID                 = var.central_account_id
       CURRENT_ACCOUNT_ID                 = var.account_id
       NOTIFICATION_TOPIC_ARN             = var.notification_topic_arn
@@ -58,7 +54,7 @@ data "aws_iam_policy_document" "lambda_policy_document" {
 
   statement {
     actions = [
-      "ecs:RunTask",
+      # "ecs:RunTask",
       "iam:PassRole",
       # "dynamodb:PutItem",
       # "dynamodb:TransactWriteItems",
@@ -72,7 +68,6 @@ data "aws_iam_policy_document" "lambda_policy_document" {
       "s3:GetObject", # for pre-signed URLs
       "s3:PutObject", # to upload modules,
       "s3:ListBucket", # to list modules (for downloading to check diff using cli)
-      "s3:*",
     ]
     resources = ["*"]
   }

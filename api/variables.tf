@@ -46,14 +46,6 @@ variable "change_records_s3_bucket" {
   type = string
 }
 
-variable "subnet_id" {
-  type = string
-}
-
-variable "security_group_id" {
-  type = string
-}
-
 variable "central_account_id" {
   type    = string
 }

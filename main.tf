@@ -79,8 +79,6 @@ module "api" {
   modules_s3_bucket         = resource.aws_s3_bucket.modules_bucket.bucket
   policies_s3_bucket        = resource.aws_s3_bucket.policies_bucket.bucket
   change_records_s3_bucket  = resource.aws_s3_bucket.change_records_bucket.bucket
-  subnet_id                 = resource.aws_subnet.public[0].id # TODO: use both subnets
-  security_group_id         = resource.aws_security_group.ecs_sg.id
   central_account_id        = local.central_account_id
   notification_topic_arn    = local.notification_topic_arn
 }
@@ -845,7 +843,6 @@ resource "aws_s3_bucket_policy" "change_records_bucket" {
   })
 }
 
-
 resource "aws_ssm_parameter" "modules_bucket" {
   name  = "/infraweave/${var.region}/${var.environment}/modules_bucket"
   type  = "String"
@@ -862,71 +859,6 @@ resource "aws_ssm_parameter" "change_records_bucket" {
   name  = "/infraweave/${var.region}/${var.environment}/change_records_bucket"
   type  = "String"
   value = resource.aws_s3_bucket.change_records_bucket.bucket
-}
-
-
-
-resource "aws_vpc" "main" {
-  cidr_block = "10.0.0.0/16"
-}
-
-resource "aws_subnet" "public" {
-  count                   = 2
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = cidrsubnet(aws_vpc.main.cidr_block, 8, count.index)
-  availability_zone       = element(["${var.region}a", "${var.region}b"], count.index)
-  map_public_ip_on_launch = true
-}
-
-resource "aws_ssm_parameter" "ecs_subnet_id" {
-  name  = "/infraweave/${var.region}/${var.environment}/ecs_subnet_id"
-  type  = "String"
-  value = resource.aws_subnet.public[0].id # TODO: use both subnets
-}
-
-resource "aws_internet_gateway" "gw" {
-  vpc_id = aws_vpc.main.id
-}
-
-resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.main.id
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.gw.id
-  }
-}
-
-resource "aws_route_table_association" "public" {
-  count          = 2
-  subnet_id      = aws_subnet.public[count.index].id
-  route_table_id = aws_route_table.public.id
-}
-
-resource "aws_security_group" "ecs_sg" {
-  vpc_id = aws_vpc.main.id
-
-  # No ingress rules
-
-  egress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port = 53
-    to_port   = 53
-    protocol  = "udp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
 }
 
 data "aws_caller_identity" "current" {}
