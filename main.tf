@@ -17,6 +17,45 @@ locals {
     change_records = "tf-change-records-${local.central_account_id}-${var.region}-${var.environment}",
     tf_state       = "tf-state-${local.central_account_id}-${var.region}-${var.environment}",
   }
+
+  notification_topic_arn = "arn:aws:sns:${var.region}:${var.central_account_id}:infraweave-${var.environment}"
+}
+
+module "webhook" {
+  count = var.enable_webhook_processor ? 1 : 0
+
+  source = "./webhook"
+  
+  infraweave_env = var.environment
+  region         = var.region
+  project_map = var.project_map
+  enable_webhook_processor_endpoint = var.enable_webhook_processor_endpoint
+  config_table_name = aws_dynamodb_resource_policy.config.id
+  webhook_image_uri = "public.ecr.aws/l0j0u4o5/infraweave/gitops-aws:v0.0.60-arm64"
+
+  providers = {
+    aws = aws
+  }
+}
+
+module "oidc" {
+  count = var.enable_oidc_provider ? 1 : 0
+  source = "./oidc"
+  
+  infraweave_env = var.environment
+  allowed_github_repos = var.allowed_github_repos
+
+  providers = {
+    aws = aws
+  }
+}
+
+output "webhook_endpoint" {
+  value = var.enable_webhook_processor && var.enable_webhook_processor_endpoint ? "${module.webhook[0].webhook_endpoint}" : null
+}
+
+output "oidc_role_arn" {
+    value = var.enable_oidc_provider ? module.oidc[0].oidc_role_arn : null
 }
 
 module "api" {
@@ -30,12 +69,14 @@ module "api" {
   deployments_table_name    = resource.aws_dynamodb_table.deployments.name
   policies_table_name       = resource.aws_dynamodb_table.policies.name
   change_records_table_name = resource.aws_dynamodb_table.change_records.name
+  config_table_name         = resource.aws_dynamodb_table.config.name
   modules_s3_bucket         = resource.aws_s3_bucket.modules_bucket.bucket
   policies_s3_bucket        = resource.aws_s3_bucket.policies_bucket.bucket
   change_records_s3_bucket  = resource.aws_s3_bucket.change_records_bucket.bucket
   subnet_id                 = resource.aws_subnet.public[0].id # TODO: use both subnets
   security_group_id         = resource.aws_security_group.ecs_sg.id
   central_account_id        = local.central_account_id
+  notification_topic_arn    = local.notification_topic_arn
 }
 
 resource "aws_dynamodb_table" "events" {
@@ -577,6 +618,47 @@ resource "aws_dynamodb_resource_policy" "deployments" {
   })
 }
 
+resource "aws_dynamodb_table" "config" {
+  name           = "Config-${var.central_account_id}-${var.region}-${var.environment}"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "PK"
+
+  attribute {
+    name = "PK"
+    type = "S"
+  }
+}
+
+resource "aws_dynamodb_resource_policy" "config" {
+  resource_arn = aws_dynamodb_table.config.arn
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:Query",
+        ],
+        Resource  = [
+          aws_dynamodb_table.config.arn,
+        ],
+        Principal = "*",
+        Condition = {
+          StringEquals = {
+            "aws:PrincipalOrgID" = local.organization_id,
+          },
+          ArnLike = {
+            "aws:PrincipalArn" = "arn:aws:iam::${local.central_account_id}:role/infraweave_api_role-${var.region}-${var.environment}",
+          }
+        }
+      }
+      # TODO: Add deny statement here for modifying the table
+    ]
+  })
+}
+
 resource "aws_s3_bucket" "modules_bucket" {
   # bucket_prefix = "modules-bucket-${var.region}-${var.environment}"
   bucket = local.bucket_names.modules
@@ -820,9 +902,23 @@ resource "aws_security_group" "ecs_sg" {
   # No ingress rules
 
   egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port = 53
+    to_port   = 53
+    protocol  = "udp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
@@ -974,25 +1070,4 @@ resource "aws_dynamodb_resource_policy" "terraform_locks" {
       }
     ]
   })
-}
-
-## User policy
-
-
-resource "aws_iam_policy" "user_lambda_policy" {
-  name        = "infraweave_api_user_policy-${var.region}-${var.environment}"
-  description = "IAM policy to use api lambda"
-  policy      = data.aws_iam_policy_document.user_lambda_policy_document.json
-}
-
-
-data "aws_iam_policy_document" "user_lambda_policy_document" {
-  statement {
-    actions = [
-      "lambda:*"
-    ]
-    resources = [
-      module.api.api_function_arn,
-    ]
-  }
 }

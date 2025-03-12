@@ -18,6 +18,10 @@ variable "change_records_table_name" {
   type = string
 }
 
+variable "config_table_name" {
+  type = string
+}
+
 variable "region" {
   type = string
 }
@@ -52,4 +56,8 @@ variable "security_group_id" {
 
 variable "central_account_id" {
   type    = string
+}
+
+variable "notification_topic_arn" {
+  type = string
 }

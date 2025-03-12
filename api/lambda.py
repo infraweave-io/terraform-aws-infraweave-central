@@ -7,6 +7,7 @@ from boto3.dynamodb.types import TypeSerializer
 region = os.environ.get('REGION')
 environment = os.environ.get('ENVIRONMENT')
 central_account_id = os.environ.get('CENTRAL_ACCOUNT_ID')
+notification_topic_arn = os.environ.get('NOTIFICATION_TOPIC_ARN')
 current_account_id = os.environ.get('CURRENT_ACCOUNT_ID')
 
 tables = {
@@ -14,7 +15,8 @@ tables = {
     'modules': os.environ.get('DYNAMODB_MODULES_TABLE_NAME'),
     'policies': os.environ.get('DYNAMODB_POLICIES_TABLE_NAME'),
     'deployments': os.environ.get('DYNAMODB_DEPLOYMENTS_TABLE_NAME'),
-    'change_records': os.environ.get('DYNAMODB_CHANGE_RECORDS_TABLE_NAME')
+    'change_records': os.environ.get('DYNAMODB_CHANGE_RECORDS_TABLE_NAME'),
+    'config': os.environ.get('DYNAMODB_CONFIG_TABLE_NAME'),
 }
 
 ecs_cluster_name = os.environ.get('ECS_CLUSTER_NAME')
@@ -159,6 +161,26 @@ def start_runner(event):
     resp = {'job_id': res['tasks'][0]['taskArn'].split('/')[-1]}
     return resp
 
+def publish_notification(event):
+    sns = boto3.client('sns')
+    payload = event.get('data', {})
+
+    message_data = payload.get('message')
+    subject = payload.get('subject', 'Unkown Subject')
+
+    if isinstance(message_data, dict):
+        message_str = json.dumps(message_data)
+    else:
+        message_str = str(message_data)
+
+    response = sns.publish(
+        TopicArn=notification_topic_arn,
+        Subject=subject,
+        Message=message_str,
+    )
+
+    return response
+
 processes = {
     'insert_db': insert_db,
     'transact_write': transact_write,
@@ -166,7 +188,8 @@ processes = {
     'read_db': read_db,
     'start_runner': start_runner,
     'read_logs': read_logs,
-    'generate_presigned_url': generate_presigned_url
+    'generate_presigned_url': generate_presigned_url,
+    'publish_notification': publish_notification,
 }
 
 def handler(event, context):

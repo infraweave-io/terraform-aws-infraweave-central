@@ -18,6 +18,7 @@ resource "aws_lambda_function" "api" {
       DYNAMODB_DEPLOYMENTS_TABLE_NAME    = var.deployments_table_name
       DYNAMODB_POLICIES_TABLE_NAME       = var.policies_table_name
       DYNAMODB_CHANGE_RECORDS_TABLE_NAME = var.change_records_table_name
+      DYNAMODB_CONFIG_TABLE_NAME         = var.config_table_name
       MODULE_S3_BUCKET                   = var.modules_s3_bucket
       POLICY_S3_BUCKET                   = var.policies_s3_bucket
       CHANGE_RECORD_S3_BUCKET           = var.change_records_s3_bucket
@@ -29,6 +30,7 @@ resource "aws_lambda_function" "api" {
       SECURITY_GROUP_ID                  = var.security_group_id
       CENTRAL_ACCOUNT_ID                 = var.central_account_id
       CURRENT_ACCOUNT_ID                 = var.account_id
+      NOTIFICATION_TOPIC_ARN             = var.notification_topic_arn
     }
   }
 }
@@ -47,6 +49,13 @@ data "aws_iam_policy_document" "assume_role" {
 }
 
 data "aws_iam_policy_document" "lambda_policy_document" {
+  
+  statement {
+    effect = "Allow"
+    actions = ["sns:Publish"]
+    resources = [var.notification_topic_arn]
+  }
+
   statement {
     actions = [
       "ecs:RunTask",
