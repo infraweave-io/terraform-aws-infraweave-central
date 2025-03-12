@@ -19,6 +19,12 @@ locals {
   }
 
   notification_topic_arn = "arn:aws:sns:${var.region}:${var.central_account_id}:infraweave-${var.environment}"
+
+  image_version = "v0.0.60-arm64"
+
+  image = "l0j0u4o5/infraweave/gitops-aws:${local.image_version}"
+  pull_through_ecr = "infraweave-ecr-public"
+  webhook_image_uri = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.region}.amazonaws.com/${local.pull_through_ecr}/${local.image}"
 }
 
 module "webhook" {
@@ -31,7 +37,7 @@ module "webhook" {
   project_map = var.project_map
   enable_webhook_processor_endpoint = var.enable_webhook_processor_endpoint
   config_table_name = aws_dynamodb_resource_policy.config.id
-  webhook_image_uri = "public.ecr.aws/l0j0u4o5/infraweave/gitops-aws:v0.0.60-arm64"
+  webhook_image_uri = local.webhook_image_uri
 
   providers = {
     aws = aws
