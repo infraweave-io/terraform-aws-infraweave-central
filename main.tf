@@ -20,9 +20,9 @@ locals {
 
   notification_topic_arn = "arn:aws:sns:${var.region}:${var.central_account_id}:infraweave-${var.environment}"
 
-  image_version = "v0.0.60-arm64"
+  image_version = "v0.0.61-arm64"
 
-  image             = "l0j0u4o5/infraweave/gitops-aws:${local.image_version}"
+  image             = "infraweave/gitops-aws:${local.image_version}"
   pull_through_ecr  = "infraweave-ecr-public"
   webhook_image_uri = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.region}.amazonaws.com/${local.pull_through_ecr}/${local.image}"
 }
