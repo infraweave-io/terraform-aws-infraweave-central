@@ -47,7 +47,7 @@ variable "change_records_s3_bucket" {
 }
 
 variable "central_account_id" {
-  type    = string
+  type = string
 }
 
 variable "notification_topic_arn" {

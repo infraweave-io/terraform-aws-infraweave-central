@@ -231,12 +231,12 @@ resource "aws_lambda_function" "processor_github_webhook_handler" {
 
   environment {
     variables = {
-      PROVIDER       = "aws"
+      PROVIDER = "aws"
       # DEBUG          = "true"
       # LOG_LEVEL      = "info"
-      RUN_MODE       = "PROCESSOR"
-      INFRAWEAVE_ENV = var.infraweave_env
-      RUST_BACKTRACE = "1"
+      RUN_MODE                               = "PROCESSOR"
+      INFRAWEAVE_ENV                         = var.infraweave_env
+      RUST_BACKTRACE                         = "1"
       GITHUB_PRIVATE_KEY_PARAMETER_STORE_KEY = aws_ssm_parameter.github_webhook_private_key.name
     }
   }
