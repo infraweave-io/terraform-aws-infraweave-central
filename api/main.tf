@@ -1,8 +1,15 @@
+locals {
+  function_name = "infraweave-api-${var.environment}"
+}
 
 resource "aws_lambda_function" "api" {
-  function_name = "infraweave-api-${var.environment}"
+  function_name = local.function_name
   runtime       = "python3.12"
   handler       = "lambda.handler"
+
+  tracing_config {
+    mode = "Active"
+  }
 
   timeout = 15
 
@@ -21,7 +28,7 @@ resource "aws_lambda_function" "api" {
       DYNAMODB_CONFIG_TABLE_NAME         = var.config_table_name
       MODULE_S3_BUCKET                   = var.modules_s3_bucket
       POLICY_S3_BUCKET                   = var.policies_s3_bucket
-      CHANGE_RECORD_S3_BUCKET           = var.change_records_s3_bucket
+      CHANGE_RECORD_S3_BUCKET            = var.change_records_s3_bucket
       REGION                             = var.region
       ENVIRONMENT                        = var.environment
       CENTRAL_ACCOUNT_ID                 = var.central_account_id
@@ -45,31 +52,46 @@ data "aws_iam_policy_document" "assume_role" {
 }
 
 data "aws_iam_policy_document" "lambda_policy_document" {
-  
+
   statement {
-    effect = "Allow"
-    actions = ["sns:Publish"]
+    effect    = "Allow"
+    actions   = ["sns:Publish"]
     resources = [var.notification_topic_arn]
   }
 
   statement {
     actions = [
-      # "ecs:RunTask",
-      "iam:PassRole",
-      # "dynamodb:PutItem",
-      # "dynamodb:TransactWriteItems",
-      # "dynamodb:DeleteItem", # for deleting deployment dependents
-      # "dynamodb:Query",
       "logs:CreateLogGroup",
       "logs:CreateLogStream",
       "logs:PutLogEvents",
       "logs:GetLogEvents",
-      "sqs:createqueue",
-      "s3:GetObject", # for pre-signed URLs
-      "s3:PutObject", # to upload modules,
+    ]
+    resources = [
+      "arn:aws:logs:${var.region}:${var.account_id}:log-group:/aws/lambda/${local.function_name}:*"
+    ]
+  }
+
+  statement {
+    actions = [
+      "s3:GetObject",  # for pre-signed URLs
+      "s3:PutObject",  # to upload modules,
       "s3:ListBucket", # to list modules (for downloading to check diff using cli)
     ]
-    resources = ["*"]
+    resources = [
+      "arn:aws:s3:::${var.modules_s3_bucket}/*",
+      "arn:aws:s3:::${var.policies_s3_bucket}/*",
+      "arn:aws:s3:::${var.change_records_s3_bucket}/*",
+    ]
+  }
+
+  statement {
+    sid = "KMSAccess"
+    actions = [
+      "kms:Decrypt",
+    ]
+    resources = [
+      "arn:aws:kms:*:${var.central_account_id}:*"
+    ]
   }
 
   statement {

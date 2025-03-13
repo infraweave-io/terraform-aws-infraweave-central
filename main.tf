@@ -1,6 +1,6 @@
 locals {
-  central_account_id      = var.central_account_id
-  organization_id = var.organization_id
+  central_account_id = var.central_account_id
+  organization_id    = var.organization_id
 
   dynamodb_table_names = {
     events         = "Events-${local.central_account_id}-${var.region}-${var.environment}",
@@ -22,8 +22,8 @@ locals {
 
   image_version = "v0.0.60-arm64"
 
-  image = "l0j0u4o5/infraweave/gitops-aws:${local.image_version}"
-  pull_through_ecr = "infraweave-ecr-public"
+  image             = "l0j0u4o5/infraweave/gitops-aws:${local.image_version}"
+  pull_through_ecr  = "infraweave-ecr-public"
   webhook_image_uri = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.region}.amazonaws.com/${local.pull_through_ecr}/${local.image}"
 }
 
@@ -31,13 +31,13 @@ module "webhook" {
   count = var.enable_webhook_processor ? 1 : 0
 
   source = "./webhook"
-  
-  infraweave_env = var.environment
-  region         = var.region
-  project_map = var.project_map
+
+  infraweave_env                    = var.environment
+  region                            = var.region
+  project_map                       = var.project_map
   enable_webhook_processor_endpoint = var.enable_webhook_processor_endpoint
-  config_table_name = aws_dynamodb_resource_policy.config.id
-  webhook_image_uri = local.webhook_image_uri
+  config_table_name                 = aws_dynamodb_resource_policy.config.id
+  webhook_image_uri                 = local.webhook_image_uri
 
   providers = {
     aws = aws
@@ -45,10 +45,10 @@ module "webhook" {
 }
 
 module "oidc" {
-  count = var.enable_oidc_provider ? 1 : 0
+  count  = var.enable_oidc_provider ? 1 : 0
   source = "./oidc"
-  
-  infraweave_env = var.environment
+
+  infraweave_env       = var.environment
   allowed_github_repos = var.allowed_github_repos
 
   providers = {
@@ -61,7 +61,7 @@ output "webhook_endpoint" {
 }
 
 output "oidc_role_arn" {
-    value = var.enable_oidc_provider ? module.oidc[0].oidc_role_arn : null
+  value = var.enable_oidc_provider ? module.oidc[0].oidc_role_arn : null
 }
 
 module "api" {
@@ -86,8 +86,13 @@ module "api" {
 resource "aws_dynamodb_table" "events" {
   name         = local.dynamodb_table_names.events
   billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "PK"
-  range_key    = "SK"
+
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  hash_key  = "PK"
+  range_key = "SK"
 
   attribute {
     name = "PK"
@@ -111,10 +116,69 @@ resource "aws_dynamodb_table" "events" {
     projection_type = "ALL"
   }
 
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.central.arn
+  }
+
   tags = {
     Name = "EventsTable"
     # Environment = var.environment_tag
   }
+}
+
+resource "aws_kms_alias" "central_alias" {
+  name          = "alias/infraweave-${var.environment}"
+  target_key_id = aws_kms_key.central.key_id
+}
+
+resource "aws_kms_key" "central" {
+  description             = "Central KMS key for Infraweave"
+  deletion_window_in_days = 7
+
+  enable_key_rotation = true
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Sid    = "Allow administration of the key",
+        Effect = "Allow",
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        },
+        Action   = "kms:*",
+        Resource = "*"
+      },
+      {
+        Sid    = "Allow Lambda usage",
+        Effect = "Allow",
+        Principal = {
+          # Replace with the ARN of the IAM role assumed by your Lambda functions
+          AWS = "*"
+        },
+        Condition = {
+          StringEquals = {
+            "aws:PrincipalOrgID" = local.organization_id
+          }
+          StringLike = {
+            "aws:PrincipalArn" = [
+              "arn:aws:iam::*:role/infraweave_api_role-${var.region}-${var.environment}",        # Single entrypoint for all services
+              "arn:aws:iam::*:role/ecs-infraweave-${var.region}-${var.environment}-service-role" # For statelock only
+            ]
+          }
+        },
+        Action = [
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey"
+        ],
+        Resource = "*"
+      }
+    ]
+  })
 }
 
 resource "aws_dynamodb_resource_policy" "events" {
@@ -157,7 +221,7 @@ resource "aws_dynamodb_resource_policy" "events" {
           # "dynamodb:UpdateItem",
           "dynamodb:Query",
         ],
-        Resource  = [
+        Resource = [
           aws_dynamodb_table.events.arn,
           "${aws_dynamodb_table.events.arn}/index/RegionIndex",
         ],
@@ -188,6 +252,10 @@ resource "aws_dynamodb_table" "modules" {
   name         = local.dynamodb_table_names.modules
   billing_mode = "PAY_PER_REQUEST"
 
+  point_in_time_recovery {
+    enabled = true
+  }
+
   # Primary Key: Partition Key (PK) and Sort Key (SK)
   hash_key  = "PK"
   range_key = "SK"
@@ -200,6 +268,11 @@ resource "aws_dynamodb_table" "modules" {
   attribute {
     name = "SK"
     type = "S"
+  }
+
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.central.arn
   }
 
   tags = {
@@ -274,6 +347,10 @@ resource "aws_dynamodb_table" "policies" {
   name         = local.dynamodb_table_names.policies
   billing_mode = "PAY_PER_REQUEST"
 
+  point_in_time_recovery {
+    enabled = true
+  }
+
   # Primary Key: Partition Key (PK) and Sort Key (SK)
   hash_key  = "PK"
   range_key = "SK"
@@ -286,6 +363,11 @@ resource "aws_dynamodb_table" "policies" {
   attribute {
     name = "SK"
     type = "S"
+  }
+
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.central.arn
   }
 
   tags = {
@@ -354,6 +436,10 @@ resource "aws_dynamodb_table" "change_records" {
   name         = local.dynamodb_table_names.change_records
   billing_mode = "PAY_PER_REQUEST"
 
+  point_in_time_recovery {
+    enabled = true
+  }
+
   # Primary Key: Partition Key (PK) and Sort Key (SK)
   hash_key  = "PK"
   range_key = "SK"
@@ -366,6 +452,11 @@ resource "aws_dynamodb_table" "change_records" {
   attribute {
     name = "SK"
     type = "S"
+  }
+
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.central.arn
   }
 
   tags = {
@@ -414,6 +505,10 @@ resource "aws_dynamodb_resource_policy" "change_records" {
 resource "aws_dynamodb_table" "deployments" {
   name         = local.dynamodb_table_names.deployments
   billing_mode = "PAY_PER_REQUEST"
+
+  point_in_time_recovery {
+    enabled = true
+  }
 
   # Primary Key: Partition Key (PK) and Sort Key (SK)
   hash_key  = "PK"
@@ -494,6 +589,11 @@ resource "aws_dynamodb_table" "deployments" {
     type = "N"
   }
 
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.central.arn
+  }
+
   tags = {
     Name = "DeploymentsTable"
   }
@@ -507,7 +607,7 @@ resource "aws_dynamodb_resource_policy" "deployments" {
     Version = "2012-10-17",
     Statement = [
       {
-        Sid = "AllowReadWriteAccessInWorkloadAccount",
+        Sid    = "AllowReadWriteAccessInWorkloadAccount",
         Effect = "Allow",
         Action = [
           "dynamodb:PutItem",
@@ -516,7 +616,7 @@ resource "aws_dynamodb_resource_policy" "deployments" {
           "dynamodb:UpdateItem",
           "dynamodb:Query",
         ],
-        Resource  = [
+        Resource = [
           aws_dynamodb_table.deployments.arn,
           "${aws_dynamodb_table.deployments.arn}/index/DeletedIndex",
           "${aws_dynamodb_table.deployments.arn}/index/ModuleIndex",
@@ -538,8 +638,8 @@ resource "aws_dynamodb_resource_policy" "deployments" {
               "PLAN#$${aws:PrincipalAccount}::${var.region}*",
               "0|DEPLOYMENT#$${aws:PrincipalAccount}::${var.region}*", # For DeletedIndex
               "1|DEPLOYMENT#$${aws:PrincipalAccount}::${var.region}*", # For DeletedIndex
-              "0|METADATA#$${aws:PrincipalAccount}::${var.region}*", # For DriftCheckIndex
-              "MODULE#$${aws:PrincipalAccount}::${var.region}*", # For ModuleIndex
+              "0|METADATA#$${aws:PrincipalAccount}::${var.region}*",   # For DriftCheckIndex
+              "MODULE#$${aws:PrincipalAccount}::${var.region}*",       # For ModuleIndex
               "PROJECT#$${aws:PrincipalAccount}",
               "PROJECTS", // Allow listing all projects (TODO: review this if it's a good idea)
             ]
@@ -547,7 +647,7 @@ resource "aws_dynamodb_resource_policy" "deployments" {
         }
       },
       {
-        Sid = "CentralFullReadAccess",
+        Sid    = "CentralFullReadAccess",
         Effect = "Allow",
         Action = [
           # "dynamodb:PutItem",
@@ -556,7 +656,7 @@ resource "aws_dynamodb_resource_policy" "deployments" {
           # "dynamodb:UpdateItem",
           "dynamodb:Query",
         ],
-        Resource  = [
+        Resource = [
           aws_dynamodb_table.deployments.arn,
           "${aws_dynamodb_table.deployments.arn}/index/DeletedIndex",
           "${aws_dynamodb_table.deployments.arn}/index/ModuleIndex",
@@ -577,8 +677,8 @@ resource "aws_dynamodb_resource_policy" "deployments" {
               "PLAN#*::${var.region}*",
               "0|DEPLOYMENT#*::${var.region}*", # For DeletedIndex
               "1|DEPLOYMENT#*::${var.region}*", # For DeletedIndex
-              "0|METADATA#*::${var.region}*", # For DriftCheckIndex
-              "MODULE#*::${var.region}*", # For ModuleIndex
+              "0|METADATA#*::${var.region}*",   # For DriftCheckIndex
+              "MODULE#*::${var.region}*",       # For ModuleIndex
               "PROJECTS",
               "PROJECT#*",
             ]
@@ -586,7 +686,7 @@ resource "aws_dynamodb_resource_policy" "deployments" {
         }
       },
       {
-        Sid = "CentralWriteModuleAndProjectAccess",
+        Sid    = "CentralWriteModuleAndProjectAccess",
         Effect = "Allow",
         Action = [
           "dynamodb:PutItem",
@@ -595,7 +695,7 @@ resource "aws_dynamodb_resource_policy" "deployments" {
           "dynamodb:UpdateItem",
           "dynamodb:Query",
         ],
-        Resource  = [
+        Resource = [
           aws_dynamodb_table.deployments.arn,
           "${aws_dynamodb_table.deployments.arn}/index/DeletedIndex",
           "${aws_dynamodb_table.deployments.arn}/index/ModuleIndex",
@@ -623,13 +723,22 @@ resource "aws_dynamodb_resource_policy" "deployments" {
 }
 
 resource "aws_dynamodb_table" "config" {
-  name           = "Config-${var.central_account_id}-${var.region}-${var.environment}"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "PK"
+  name         = "Config-${var.central_account_id}-${var.region}-${var.environment}"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "PK"
+
+  point_in_time_recovery {
+    enabled = true
+  }
 
   attribute {
     name = "PK"
     type = "S"
+  }
+
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.central.arn
   }
 }
 
@@ -645,7 +754,7 @@ resource "aws_dynamodb_resource_policy" "config" {
           "dynamodb:GetItem",
           "dynamodb:Query",
         ],
-        Resource  = [
+        Resource = [
           aws_dynamodb_table.config.arn,
         ],
         Principal = "*",
@@ -663,6 +772,7 @@ resource "aws_dynamodb_resource_policy" "config" {
   })
 }
 
+#trivy:ignore:aws-s3-enable-bucket-logging
 resource "aws_s3_bucket" "modules_bucket" {
   # bucket_prefix = "modules-bucket-${var.region}-${var.environment}"
   bucket = local.bucket_names.modules
@@ -675,6 +785,33 @@ resource "aws_s3_bucket" "modules_bucket" {
   }
 }
 
+resource "aws_s3_bucket_versioning" "modules_bucket" {
+  bucket = aws_s3_bucket.modules_bucket.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "modules" {
+  bucket = aws_s3_bucket.modules_bucket.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.central.arn
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "modules_bucket" {
+  bucket = aws_s3_bucket.modules_bucket.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
 resource "aws_s3_bucket_policy" "modules_bucket" {
   bucket = aws_s3_bucket.modules_bucket.id
 
@@ -682,18 +819,18 @@ resource "aws_s3_bucket_policy" "modules_bucket" {
     Version = "2012-10-17",
     Statement = [
       {
-        Sid = "AllowReadModulesForEveryone",
-        Effect   = "Allow",
+        Sid       = "AllowReadModulesForEveryone",
+        Effect    = "Allow",
         Principal = "*",
-        Action   = [
+        Action = [
           "s3:GetObject",
           # "s3:PutObject",
           # "s3:DeleteObject",
           "s3:ListBucket"
         ],
         Resource = [
-          "${aws_s3_bucket.modules_bucket.arn}",       # Bucket-level actions
-          "${aws_s3_bucket.modules_bucket.arn}/*"     # Object-level actions
+          "${aws_s3_bucket.modules_bucket.arn}",  # Bucket-level actions
+          "${aws_s3_bucket.modules_bucket.arn}/*" # Object-level actions
         ],
         Condition = {
           StringEquals = {
@@ -705,18 +842,18 @@ resource "aws_s3_bucket_policy" "modules_bucket" {
         }
       },
       {
-        Sid = "AllowWriteModulesForCentral",
-        Effect   = "Allow",
+        Sid       = "AllowWriteModulesForCentral",
+        Effect    = "Allow",
         Principal = "*",
-        Action   = [
+        Action = [
           "s3:GetObject",
           "s3:PutObject",
           # "s3:DeleteObject",
           "s3:ListBucket"
         ],
         Resource = [
-          "${aws_s3_bucket.modules_bucket.arn}",       # Bucket-level actions
-          "${aws_s3_bucket.modules_bucket.arn}/*"     # Object-level actions
+          "${aws_s3_bucket.modules_bucket.arn}",  # Bucket-level actions
+          "${aws_s3_bucket.modules_bucket.arn}/*" # Object-level actions
         ],
         Condition = {
           StringEquals = {
@@ -731,6 +868,7 @@ resource "aws_s3_bucket_policy" "modules_bucket" {
   })
 }
 
+#trivy:ignore:aws-s3-enable-bucket-logging
 resource "aws_s3_bucket" "policies_bucket" {
   # bucket_prefix = "policies-bucket-${var.region}-${var.environment}"
   bucket = local.bucket_names.policies
@@ -743,6 +881,33 @@ resource "aws_s3_bucket" "policies_bucket" {
   }
 }
 
+resource "aws_s3_bucket_versioning" "policies_bucket" {
+  bucket = aws_s3_bucket.policies_bucket.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "policies" {
+  bucket = aws_s3_bucket.policies_bucket.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.central.arn
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "policies_bucket" {
+  bucket = aws_s3_bucket.policies_bucket.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
 resource "aws_s3_bucket_policy" "policies_bucket" {
   bucket = aws_s3_bucket.policies_bucket.id
 
@@ -750,18 +915,18 @@ resource "aws_s3_bucket_policy" "policies_bucket" {
     Version = "2012-10-17",
     Statement = [
       {
-        Sid = "AllowReadPolicyForEveryone",
-        Effect   = "Allow",
+        Sid       = "AllowReadPolicyForEveryone",
+        Effect    = "Allow",
         Principal = "*",
-        Action   = [
+        Action = [
           "s3:GetObject",
           # "s3:PutObject",
           # "s3:DeleteObject",
           "s3:ListBucket"
         ],
         Resource = [
-          "${aws_s3_bucket.policies_bucket.arn}",       # Bucket-level actions
-          "${aws_s3_bucket.policies_bucket.arn}/*"     # Object-level actions
+          "${aws_s3_bucket.policies_bucket.arn}",  # Bucket-level actions
+          "${aws_s3_bucket.policies_bucket.arn}/*" # Object-level actions
         ],
         Condition = {
           StringEquals = {
@@ -773,18 +938,18 @@ resource "aws_s3_bucket_policy" "policies_bucket" {
         }
       },
       {
-        Sid = "AllowWritePolicyForCentral",
-        Effect   = "Allow",
+        Sid       = "AllowWritePolicyForCentral",
+        Effect    = "Allow",
         Principal = "*",
-        Action   = [
+        Action = [
           "s3:GetObject",
           "s3:PutObject",
           # "s3:DeleteObject",
           "s3:ListBucket"
         ],
         Resource = [
-          "${aws_s3_bucket.policies_bucket.arn}",       # Bucket-level actions
-          "${aws_s3_bucket.policies_bucket.arn}/*"     # Object-level actions
+          "${aws_s3_bucket.policies_bucket.arn}",  # Bucket-level actions
+          "${aws_s3_bucket.policies_bucket.arn}/*" # Object-level actions
         ],
         Condition = {
           StringEquals = {
@@ -799,6 +964,7 @@ resource "aws_s3_bucket_policy" "policies_bucket" {
   })
 }
 
+#trivy:ignore:aws-s3-enable-bucket-logging
 resource "aws_s3_bucket" "change_records_bucket" {
   # bucket_prefix = "change-records-${var.region}-${var.environment}"
   bucket = local.bucket_names.change_records
@@ -811,6 +977,33 @@ resource "aws_s3_bucket" "change_records_bucket" {
   }
 }
 
+resource "aws_s3_bucket_versioning" "change_records_bucket" {
+  bucket = aws_s3_bucket.change_records_bucket.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "change_records" {
+  bucket = aws_s3_bucket.change_records_bucket.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.central.arn
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "change_records_bucket" {
+  bucket = aws_s3_bucket.change_records_bucket.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
 resource "aws_s3_bucket_policy" "change_records_bucket" {
   bucket = aws_s3_bucket.change_records_bucket.id
 
@@ -818,17 +1011,17 @@ resource "aws_s3_bucket_policy" "change_records_bucket" {
     Version = "2012-10-17",
     Statement = [
       {
-        Effect   = "Allow",
+        Effect    = "Allow",
         Principal = "*",
-        Action   = [
+        Action = [
           "s3:GetObject",
           "s3:PutObject",
           # "s3:DeleteObject",
           "s3:ListBucket"
         ],
         Resource = [
-          "${aws_s3_bucket.change_records_bucket.arn}",       # Bucket-level actions
-          "${aws_s3_bucket.change_records_bucket.arn}/*"     # Object-level actions
+          "${aws_s3_bucket.change_records_bucket.arn}",  # Bucket-level actions
+          "${aws_s3_bucket.change_records_bucket.arn}/*" # Object-level actions
         ],
         Condition = {
           StringEquals = {
@@ -879,7 +1072,7 @@ data "aws_caller_identity" "current" {}
 #   upstream_registry_url = "ghcr.io"
 # }
 
-
+#trivy:ignore:aws-s3-enable-bucket-logging
 resource "aws_s3_bucket" "terraform_state" {
   bucket = local.bucket_names.tf_state
 
@@ -890,6 +1083,33 @@ resource "aws_s3_bucket" "terraform_state" {
     # Environment = var.environment
     # Region      = var.region
   }
+}
+
+resource "aws_s3_bucket_versioning" "terraform_state" {
+  bucket = aws_s3_bucket.terraform_state.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "terraform_state" {
+  bucket = aws_s3_bucket.terraform_state.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.central.arn
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "terraform_state" {
+  bucket = aws_s3_bucket.terraform_state.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
 }
 
 resource "aws_s3_bucket_policy" "terraform_state" {
@@ -917,12 +1137,12 @@ resource "aws_s3_bucket_policy" "terraform_state" {
         # Object-level actions
         Effect    = "Allow",
         Principal = "*",
-        Action    = [
+        Action = [
           "s3:GetObject",
           "s3:PutObject",
           # "s3:DeleteObject"
         ],
-        Resource  = "${aws_s3_bucket.terraform_state.arn}/$${aws:PrincipalAccount}/*",
+        Resource = "${aws_s3_bucket.terraform_state.arn}/$${aws:PrincipalAccount}/*",
         Condition = {
           StringEquals = {
             "aws:PrincipalOrgID" = local.organization_id
@@ -948,7 +1168,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "example" {
 
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.central.arn
     }
   }
 }
@@ -959,6 +1180,10 @@ resource "aws_dynamodb_table" "terraform_locks" {
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "LockID"
 
+  point_in_time_recovery {
+    enabled = true
+  }
+
   attribute {
     name = "LockID"
     type = "S"
@@ -967,6 +1192,11 @@ resource "aws_dynamodb_table" "terraform_locks" {
   # lifecycle {
   #   prevent_destroy = true
   # }
+
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.central.arn
+  }
 
   tags = {
     Name = "TerraformStateLocks"
@@ -990,7 +1220,7 @@ resource "aws_dynamodb_resource_policy" "terraform_locks" {
           "dynamodb:UpdateItem",
           "dynamodb:Query",
         ],
-        Resource  = [
+        Resource = [
           aws_dynamodb_table.terraform_locks.arn,
         ],
         Principal = "*",

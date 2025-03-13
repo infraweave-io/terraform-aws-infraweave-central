@@ -14,7 +14,7 @@ data "aws_region" "current" {}
 
 resource "aws_apigatewayv2_api" "http_api" {
   name          = "github-webhook-api-${var.infraweave_env}"
-  protocol_type = "HTTP"  
+  protocol_type = "HTTP"
 }
 
 resource "aws_apigatewayv2_integration" "lambda_integration" {
@@ -47,5 +47,5 @@ resource "aws_lambda_permission" "apigw_lambda" {
   action        = "lambda:InvokeFunction"
   function_name = var.validator_lambda_function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn = "${aws_apigatewayv2_api.http_api.execution_arn}/$default/POST/webhook"
+  source_arn    = "${aws_apigatewayv2_api.http_api.execution_arn}/$default/POST/webhook"
 }
