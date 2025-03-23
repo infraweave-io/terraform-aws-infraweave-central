@@ -20,7 +20,7 @@ locals {
 
   notification_topic_arn = "arn:aws:sns:${var.region}:${var.central_account_id}:infraweave-${var.environment}"
 
-  image_version = "v0.0.61-arm64"
+  image_version = "v0.0.69-rc.0-arm64"
 
   image             = "infraweave/gitops-aws:${local.image_version}"
   pull_through_ecr  = "infraweave-ecr-public"
@@ -34,7 +34,7 @@ module "webhook" {
 
   infraweave_env                    = var.environment
   region                            = var.region
-  project_map                       = var.project_map
+  all_workload_projects             = var.all_workload_projects
   enable_webhook_processor_endpoint = var.enable_webhook_processor_endpoint
   config_table_name                 = aws_dynamodb_resource_policy.config.id
   webhook_image_uri                 = local.webhook_image_uri
@@ -45,11 +45,11 @@ module "webhook" {
 }
 
 module "oidc" {
-  count  = var.enable_oidc_provider ? 1 : 0
+  count  = length(var.oidc_allowed_github_repos) > 0 ? 1 : 0
   source = "./oidc"
 
-  infraweave_env       = var.environment
-  allowed_github_repos = var.allowed_github_repos
+  infraweave_env            = var.environment
+  oidc_allowed_github_repos = var.oidc_allowed_github_repos
 
   providers = {
     aws = aws
@@ -61,7 +61,7 @@ output "webhook_endpoint" {
 }
 
 output "oidc_role_arn" {
-  value = var.enable_oidc_provider ? module.oidc[0].oidc_role_arn : null
+  value = length(var.oidc_allowed_github_repos) > 0 ? module.oidc[0].oidc_role_arn : null
 }
 
 module "api" {
@@ -726,6 +726,7 @@ resource "aws_dynamodb_table" "config" {
   name         = "Config-${var.central_account_id}-${var.region}-${var.environment}"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "PK"
+  range_key    = "SK"
 
   point_in_time_recovery {
     enabled = true
@@ -736,10 +737,44 @@ resource "aws_dynamodb_table" "config" {
     type = "S"
   }
 
+  attribute {
+    name = "SK"
+    type = "S"
+  }
+
   server_side_encryption {
     enabled     = true
     kms_key_arn = aws_kms_key.central.arn
   }
+}
+
+resource "aws_dynamodb_table_item" "config" {
+  table_name = aws_dynamodb_table.config.name
+  hash_key   = "PK"
+  range_key  = "SK"
+  item = jsonencode({
+    PK = { S = "all_regions" },
+    SK = { S = "all" },
+    data = { M = {
+      regions = { L = [for region in var.all_regions : { S = region }] }
+    } }
+  })
+}
+
+resource "aws_dynamodb_table_item" "all_projects" {
+  for_each = { for project in var.all_workload_projects : project.project_id => project }
+
+  table_name = aws_dynamodb_table.config.name
+  hash_key   = "PK"
+  range_key  = "SK"
+  item = jsonencode({
+    PK          = { S = "PROJECTS" }
+    SK          = { S = "PROJECT#${each.value.project_id}" }
+    project_id  = { S = each.value.project_id }
+    name        = { S = each.value.name }
+    description = { S = each.value.description }
+    regions     = { L = [for region in each.value.regions : { S = region }] }
+  })
 }
 
 resource "aws_dynamodb_resource_policy" "config" {

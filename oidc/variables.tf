@@ -1,5 +1,5 @@
 
-variable "allowed_github_repos" {
+variable "oidc_allowed_github_repos" {
   type    = list(string)
   default = []
 }

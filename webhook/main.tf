@@ -8,17 +8,19 @@ terraform {
 }
 
 locals {
-  # Transform the raw data into DynamoDB's JSON format
-  p = jsondecode(var.project_map)
   transformed_project_map = {
-    PK = { S = local.p.id }
+    PK = { S = "project_map" }
+    SK = { S = "all" }
     data = {
-      M = { for key, value in local.p.data :
-        key => { M = { for subkey, subvalue in value : subkey => { S = subvalue } } }
-      }
+      M = merge([
+        for project in var.all_workload_projects : {
+          for repo in project.github_repos_deploy : repo => {
+            M = { project_id = { S = tostring(project.project_id) } }
+          }
+        }
+      ]...)
     }
   }
-
 }
 
 data "aws_organizations_organization" "current_org" {}
@@ -129,6 +131,7 @@ resource "aws_ssm_parameter" "github_webhook_private_key" {
 resource "aws_dynamodb_table_item" "config" {
   table_name = var.config_table_name
   hash_key   = "PK"
+  range_key  = "SK"
   item       = jsonencode(local.transformed_project_map)
 }
 
@@ -149,8 +152,8 @@ resource "aws_lambda_function" "validator_github_webhook_handler" {
       INFRAWEAVE_ENV                    = var.infraweave_env
       RUST_BACKTRACE                    = "1"
       GITHUB_SECRET_PARAMETER_STORE_KEY = aws_ssm_parameter.github_webhook_secret.name
-      # DEBUG                             = "true"
-      # LOG_LEVEL                         = "info"
+      DEBUG                             = "true"
+      LOG_LEVEL                         = "info"
     }
   }
 }
@@ -231,9 +234,9 @@ resource "aws_lambda_function" "processor_github_webhook_handler" {
 
   environment {
     variables = {
-      PROVIDER = "aws"
-      # DEBUG          = "true"
-      # LOG_LEVEL      = "info"
+      PROVIDER                               = "aws"
+      DEBUG                                  = "true"
+      LOG_LEVEL                              = "info"
       RUN_MODE                               = "PROCESSOR"
       INFRAWEAVE_ENV                         = var.infraweave_env
       RUST_BACKTRACE                         = "1"

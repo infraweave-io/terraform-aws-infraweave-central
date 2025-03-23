@@ -37,7 +37,7 @@ resource "aws_iam_role" "oidc_role" {
         Condition = {
           "StringLike" = {
             "token.actions.githubusercontent.com:sub" = [
-              for repo in var.allowed_github_repos : "repo:${repo}:*"
+              for repo in var.oidc_allowed_github_repos : "repo:${repo}:*"
             ],
           }
           "StringEquals" = {

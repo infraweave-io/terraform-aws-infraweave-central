@@ -3,6 +3,7 @@ import boto3
 import json
 import os
 from boto3.dynamodb.types import TypeSerializer
+from botocore.client import Config
 
 region = os.environ.get('REGION')
 environment = os.environ.get('ENVIRONMENT')
@@ -116,8 +117,11 @@ def upload_file_base64(event):
     )
 
 def generate_presigned_url(event):
-    s3 = boto3.client('s3', 
-        region_name=region, endpoint_url=f'https://s3.{region}.amazonaws.com' # https://github.com/boto/boto3/issues/2989
+    s3 = boto3.client(
+        's3',
+        region_name=region, 
+        endpoint_url=f'https://s3.{region}.amazonaws.com', # https://github.com/boto/boto3/issues/2989
+        config=Config(signature_version='s3v4'), # Modern version, required for SSE-KMS encryption
     )
     payload = event.get('data')
     url = s3.generate_presigned_url(
