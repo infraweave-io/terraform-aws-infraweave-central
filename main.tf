@@ -20,7 +20,7 @@ locals {
 
   notification_topic_arn = "arn:aws:sns:${var.region}:${var.central_account_id}:infraweave-${var.environment}"
 
-  image_version = "v0.0.69-rc.0-arm64"
+  image_version = "v0.0.72-arm64"
 
   image             = "infraweave/gitops-aws:${local.image_version}"
   pull_through_ecr  = "infraweave-ecr-public"
@@ -774,6 +774,21 @@ resource "aws_dynamodb_table_item" "all_projects" {
     name        = { S = each.value.name }
     description = { S = each.value.description }
     regions     = { L = [for region in each.value.regions : { S = region }] }
+    repositories = { L = concat(
+      [for repo in each.value.github_repos_deploy : { M = {
+        git_provider    = { S = "github" },
+        git_url         = { S = "https://github.com" },
+        repository_path = { S = repo },
+        type            = { S = "webhook" }
+
+      } }],
+      [for repo in each.value.github_repos_oidc : { M = {
+        git_provider    = { S = "github" },
+        git_url         = { S = "https://github.com" },
+        repository_path = { S = repo },
+        type            = { S = "oidc" }
+      } }]
+    ) }
   })
 }
 
