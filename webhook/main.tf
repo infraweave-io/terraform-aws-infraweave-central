@@ -251,7 +251,7 @@ resource "aws_sns_topic" "webhook_topic" {
 
 resource "aws_sqs_queue" "webhook_queue" {
   name                       = "infraweave-${var.infraweave_env}-webhook"
-  visibility_timeout_seconds = 80
+  visibility_timeout_seconds = 360
 }
 
 resource "aws_sns_topic_subscription" "webhook_subscription" {
