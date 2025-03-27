@@ -48,8 +48,9 @@ module "oidc" {
   count  = length(var.oidc_allowed_github_repos) > 0 ? 1 : 0
   source = "./oidc"
 
-  infraweave_env            = var.environment
-  oidc_allowed_github_repos = var.oidc_allowed_github_repos
+  infraweave_env              = var.environment
+  create_github_oidc_provider = var.create_github_oidc_provider
+  oidc_allowed_github_repos   = var.oidc_allowed_github_repos
 
   providers = {
     aws = aws

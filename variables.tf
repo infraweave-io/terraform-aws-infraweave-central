@@ -55,3 +55,8 @@ variable "all_workload_projects" {
     })
   )
 }
+
+variable "create_github_oidc_provider" {
+  type    = bool
+  default = true
+}

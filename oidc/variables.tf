@@ -8,3 +8,7 @@ variable "infraweave_env" {
   type    = string
   default = "prod"
 }
+
+variable "create_github_oidc_provider" {
+  type = bool
+}
