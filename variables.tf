@@ -9,16 +9,6 @@ variable "region" {
   description = "AWS region"
 }
 
-variable "central_account_id" {
-  type    = string
-  default = null
-}
-
-variable "organization_id" {
-  type     = string
-  nullable = false
-}
-
 variable "enable_webhook_processor" {
   description = "Create a webhook processor for the region, should be enabled in all regions if enabled in primary"
   type        = bool

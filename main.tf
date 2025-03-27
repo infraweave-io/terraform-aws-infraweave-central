@@ -1,6 +1,6 @@
 locals {
-  central_account_id = var.central_account_id
-  organization_id    = var.organization_id
+  central_account_id = data.aws_caller_identity.current.account_id
+  organization_id    = data.aws_organizations_organization.current_org.id
 
   dynamodb_table_names = {
     events         = "Events-${local.central_account_id}-${var.region}-${var.environment}",
@@ -18,7 +18,7 @@ locals {
     tf_state       = "tf-state-${local.central_account_id}-${var.region}-${var.environment}",
   }
 
-  notification_topic_arn = "arn:aws:sns:${var.region}:${var.central_account_id}:infraweave-${var.environment}"
+  notification_topic_arn = "arn:aws:sns:${var.region}:${local.central_account_id}:infraweave-${var.environment}"
 
   image_version = "v0.0.72-arm64"
 
@@ -26,6 +26,8 @@ locals {
   pull_through_ecr  = "infraweave-ecr-public"
   webhook_image_uri = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.region}.amazonaws.com/${local.pull_through_ecr}/${local.image}"
 }
+
+data "aws_organizations_organization" "current_org" {}
 
 module "webhook" {
   count = var.enable_webhook_processor ? 1 : 0
@@ -724,7 +726,7 @@ resource "aws_dynamodb_resource_policy" "deployments" {
 }
 
 resource "aws_dynamodb_table" "config" {
-  name         = "Config-${var.central_account_id}-${var.region}-${var.environment}"
+  name         = "Config-${local.central_account_id}-${var.region}-${var.environment}"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "PK"
   range_key    = "SK"
