@@ -22,6 +22,12 @@ resource "aws_iam_openid_connect_provider" "github" {
   thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
 }
 
+data "aws_iam_openid_connect_provider" "github" {
+  count = var.create_github_oidc_provider ? 0 : 1
+
+  url = "https://token.actions.githubusercontent.com"
+}
+
 resource "aws_iam_role" "oidc_role" {
   name = "infraweave-oidc-role-${var.infraweave_env}"
 
@@ -32,7 +38,7 @@ resource "aws_iam_role" "oidc_role" {
         Effect = "Allow"
         Principal = {
           Federated = [
-            aws_iam_openid_connect_provider.github.arn,
+            var.create_github_oidc_provider ? aws_iam_openid_connect_provider.github[0].arn : data.aws_iam_openid_connect_provider.github[0].arn,
           ]
         }
         Action = "sts:AssumeRoleWithWebIdentity"
