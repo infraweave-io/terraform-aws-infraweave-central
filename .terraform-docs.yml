@@ -25,9 +25,7 @@ content: |-
 
   # Examples
 
-  ```hcl
-  {{ include "examples/primary/main.tf" }}
-  ```
+  Please check out the [how it is used in the bootstrap](https://github.com/infraweave-io/aws-bootstrap/blob/main/central.tf) repository for up-to-date examples if you need a custom solution.
 
   {{ .Resources }}
 
