@@ -1,7 +1,7 @@
 
 variable "environment" {
   type        = string
-  description = "Environment, e.g. dev, test, prod"
+  description = "Environment for InfraWeave, e.g. dev, test, prod"
 }
 
 variable "region" {
