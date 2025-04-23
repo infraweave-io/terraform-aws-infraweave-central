@@ -1073,8 +1073,8 @@ resource "aws_s3_bucket_policy" "change_records_bucket" {
           "s3:ListBucket"
         ],
         Resource = [
-          "${aws_s3_bucket.change_records_bucket.arn}",  # Bucket-level actions
-          "${aws_s3_bucket.change_records_bucket.arn}/*" # Object-level actions
+          "${aws_s3_bucket.change_records_bucket.arn}",                           # Bucket-level actions
+          "${aws_s3_bucket.change_records_bucket.arn}/$${aws:PrincipalAccount}/*" # Object-level actions
         ],
         Condition = {
           StringEquals = {
