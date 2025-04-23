@@ -16,6 +16,7 @@ locals {
     policies       = "tf-policies-${local.central_account_id}-${var.region}-${var.environment}",
     change_records = "tf-change-records-${local.central_account_id}-${var.region}-${var.environment}",
     tf_state       = "tf-state-${local.central_account_id}-${var.region}-${var.environment}",
+    tf_providers   = "tf-providers-${local.central_account_id}-${var.region}-${var.environment}",
   }
 
   notification_topic_arn = "arn:aws:sns:${var.region}:${local.central_account_id}:infraweave-${var.environment}"
@@ -82,6 +83,7 @@ module "api" {
   modules_s3_bucket         = resource.aws_s3_bucket.modules_bucket.bucket
   policies_s3_bucket        = resource.aws_s3_bucket.policies_bucket.bucket
   change_records_s3_bucket  = resource.aws_s3_bucket.change_records_bucket.bucket
+  providers_s3_bucket       = resource.aws_s3_bucket.providers_bucket.bucket
   central_account_id        = local.central_account_id
   notification_topic_arn    = local.notification_topic_arn
 }
@@ -1227,6 +1229,113 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "example" {
   }
 }
 
+#trivy:ignore:aws-s3-enable-bucket-logging
+resource "aws_s3_bucket" "providers_bucket" {
+  bucket = local.bucket_names.tf_providers
+
+  force_destroy = true
+
+  tags = {
+    Name = "TerraformProvidersBucket"
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "it_default" {
+  bucket = aws_s3_bucket.providers_bucket.id
+
+  rule {
+    id     = "default-intelligent-tiering"
+    status = "Enabled"
+
+    filter {}
+
+    transition {
+      days          = 0
+      storage_class = "INTELLIGENT_TIERING"
+    }
+  }
+}
+
+resource "aws_s3_bucket_versioning" "providers_bucket" {
+  bucket = aws_s3_bucket.providers_bucket.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "providers_bucket" {
+  bucket = aws_s3_bucket.providers_bucket.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.central.arn
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "providers_bucket" {
+  bucket = aws_s3_bucket.providers_bucket.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_policy" "providers_bucket" {
+  bucket = aws_s3_bucket.providers_bucket.id
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Sid       = "AllowReadProvidersForEveryone",
+        Effect    = "Allow",
+        Principal = "*",
+        Action = [
+          "s3:GetObject",
+          "s3:ListBucket",
+        ],
+        Resource = [
+          "${aws_s3_bucket.providers_bucket.arn}",  # Bucket-level actions
+          "${aws_s3_bucket.providers_bucket.arn}/*" # Object-level actions
+        ],
+        Condition = {
+          StringEquals = {
+            "aws:PrincipalOrgID" = local.organization_id
+          },
+          ArnLike = {
+            "aws:PrincipalArn" = "arn:aws:iam::*:role/infraweave_api_role-${var.region}-${var.environment}",
+          },
+        }
+      },
+      {
+        Sid       = "AllowWriteProvidersForCentral",
+        Effect    = "Allow",
+        Principal = "*",
+        Action = [
+          "s3:GetObject",
+          "s3:ListBucket",
+          "s3:PutObject",
+          # "s3:DeleteObject",
+        ],
+        Resource = [
+          "${aws_s3_bucket.providers_bucket.arn}",  # Bucket-level actions
+          "${aws_s3_bucket.providers_bucket.arn}/*" # Object-level actions
+        ],
+        Condition = {
+          StringEquals = {
+            "aws:PrincipalOrgID" = local.organization_id
+          },
+          ArnLike = {
+            "aws:PrincipalArn" = "arn:aws:iam::${local.central_account_id}:role/infraweave_api_role-${var.region}-${var.environment}"
+          }
+        }
+      }
+    ]
+  })
+}
 
 resource "aws_dynamodb_table" "terraform_locks" {
   name         = local.dynamodb_table_names.tf_locks

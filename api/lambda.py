@@ -4,6 +4,9 @@ import json
 import os
 from boto3.dynamodb.types import TypeSerializer
 from botocore.client import Config
+import urllib.request
+from boto3.s3.transfer import TransferConfig
+from botocore.exceptions import ClientError
 
 region = os.environ.get('REGION')
 environment = os.environ.get('ENVIRONMENT')
@@ -26,7 +29,8 @@ ecs_task_definition = os.environ.get('ECS_TASK_DEFINITION')
 buckets = {
     'modules': os.environ.get('MODULE_S3_BUCKET'),
     'policies': os.environ.get('POLICY_S3_BUCKET'),
-    'change_records': os.environ.get('CHANGE_RECORD_S3_BUCKET')
+    'change_records': os.environ.get('CHANGE_RECORD_S3_BUCKET'),
+    'providers': os.environ.get('PROVIDERS_S3_BUCKET'),
 }
     
 def insert_db(event):
@@ -116,6 +120,43 @@ def upload_file_base64(event):
         Body=binary_body
     )
 
+def upload_file_url(event):
+    s3 = boto3.client('s3')
+    payload = event.get('data')
+    bucket = buckets[payload.get('bucket_name')]
+    url = payload.get('url')
+    key = payload.get('key')
+
+    def object_exists():
+        try:
+            s3.head_object(Bucket=bucket, Key=key)
+        except ClientError as e:
+            if e.response['Error']['Code'] == '404':
+                return False
+            raise
+        return True
+
+    if object_exists():
+        print(f'Key {key} already exists in S3 bucket {bucket}, skipping upload')
+        return {'object_already_exists': True}
+    
+    CONFIG = TransferConfig(
+        multipart_threshold=5 * 1024 * 1024,
+        multipart_chunksize=5 * 1024 * 1024,
+        max_concurrency=1,
+        max_io_queue=1,
+        io_chunksize=5 * 1024 * 1024,
+    )
+    with urllib.request.urlopen(url) as resp:
+        # stream-upload the file to S3
+        s3.upload_fileobj(
+            Fileobj=resp,
+            Bucket=bucket,
+            Key=key,
+            Config=CONFIG
+        )
+    return {'object_already_exists': False}
+
 def generate_presigned_url(event):
     s3 = boto3.client(
         's3',
@@ -189,6 +230,7 @@ processes = {
     'insert_db': insert_db,
     'transact_write': transact_write,
     'upload_file_base64': upload_file_base64,
+    'upload_file_url': upload_file_url,
     'read_db': read_db,
     'start_runner': start_runner,
     'read_logs': read_logs,

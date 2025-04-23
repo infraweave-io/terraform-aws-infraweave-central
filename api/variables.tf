@@ -46,6 +46,10 @@ variable "change_records_s3_bucket" {
   type = string
 }
 
+variable "providers_s3_bucket" {
+  type = string
+}
+
 variable "central_account_id" {
   type = string
 }

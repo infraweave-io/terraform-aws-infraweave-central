@@ -11,7 +11,7 @@ resource "aws_lambda_function" "api" {
     mode = "Active"
   }
 
-  timeout = 15
+  timeout = 35 # Uploads for providers can take a while
 
   filename = "${path.module}/lambda_function_payload.zip"
   role     = aws_iam_role.iam_for_lambda.arn
@@ -29,6 +29,7 @@ resource "aws_lambda_function" "api" {
       MODULE_S3_BUCKET                   = var.modules_s3_bucket
       POLICY_S3_BUCKET                   = var.policies_s3_bucket
       CHANGE_RECORD_S3_BUCKET            = var.change_records_s3_bucket
+      PROVIDERS_S3_BUCKET                = var.providers_s3_bucket
       REGION                             = var.region
       ENVIRONMENT                        = var.environment
       CENTRAL_ACCOUNT_ID                 = var.central_account_id
