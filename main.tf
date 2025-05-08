@@ -21,7 +21,7 @@ locals {
 
   notification_topic_arn = "arn:aws:sns:${var.region}:${local.central_account_id}:infraweave-${var.environment}"
 
-  image_version = "v0.0.80-arm64"
+  image_version = "v0.0.84-arm64"
 
   image             = "infraweave/gitops-aws:${local.image_version}"
   pull_through_ecr  = "infraweave-ecr-public"
