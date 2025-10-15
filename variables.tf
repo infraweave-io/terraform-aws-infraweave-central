@@ -50,3 +50,11 @@ variable "create_github_oidc_provider" {
   type    = bool
   default = true
 }
+
+variable "terraform_state_additional_role_arns" {
+  description = "Additional IAM role ARN patterns to allow access to the Terraform state bucket of its own account id within the same organization"
+  type        = list(string)
+  default     = [
+    "arn:aws:iam::*:role/*AWSReservedSSO_AdministratorAccess_*",
+  ]
+}

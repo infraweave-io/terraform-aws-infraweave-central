@@ -167,10 +167,10 @@ resource "aws_kms_key" "central" {
             "aws:PrincipalOrgID" = local.organization_id
           }
           StringLike = {
-            "aws:PrincipalArn" = [
+            "aws:PrincipalArn" = concat([
               "arn:aws:iam::*:role/infraweave_api_role-${var.region}-${var.environment}",        # Single entrypoint for all services
               "arn:aws:iam::*:role/ecs-infraweave-${var.region}-${var.environment}-service-role" # For statelock only
-            ]
+            ], var.terraform_state_additional_role_arns)
           }
         },
         Action = [
@@ -1184,7 +1184,10 @@ resource "aws_s3_bucket_policy" "terraform_state" {
             "aws:PrincipalOrgID" = local.organization_id
           },
           ArnLike = {
-            "aws:PrincipalArn" = "arn:aws:iam::*:role/ecs-infraweave-${var.region}-${var.environment}-service-role"
+            "aws:PrincipalArn" = concat(
+              ["arn:aws:iam::*:role/ecs-infraweave-${var.region}-${var.environment}-service-role"],
+              var.terraform_state_additional_role_arns
+            )
           }
         }
       },
@@ -1203,7 +1206,10 @@ resource "aws_s3_bucket_policy" "terraform_state" {
             "aws:PrincipalOrgID" = local.organization_id
           },
           ArnLike = {
-            "aws:PrincipalArn" = "arn:aws:iam::*:role/ecs-infraweave-${var.region}-${var.environment}-service-role"
+            "aws:PrincipalArn" = concat(
+              ["arn:aws:iam::*:role/ecs-infraweave-${var.region}-${var.environment}-service-role"],
+              var.terraform_state_additional_role_arns
+            )
           },
         }
       }
@@ -1391,7 +1397,9 @@ resource "aws_dynamodb_resource_policy" "terraform_locks" {
             "aws:PrincipalOrgID" = local.organization_id,
           },
           ArnLike = {
-            "aws:PrincipalArn" = "arn:aws:iam::*:role/ecs-infraweave-${var.region}-${var.environment}-service-role"
+            "aws:PrincipalArn" = concat([
+              "arn:aws:iam::*:role/ecs-infraweave-${var.region}-${var.environment}-service-role",
+            ], var.terraform_state_additional_role_arns)
           }
           "ForAllValues:StringLike" = {
             "dynamodb:LeadingKeys" = "${local.bucket_names.tf_state}/$${aws:PrincipalAccount}/*"
