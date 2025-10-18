@@ -57,3 +57,8 @@ variable "central_account_id" {
 variable "notification_topic_arn" {
   type = string
 }
+
+variable "is_primary_region" {
+  type = bool
+}
+

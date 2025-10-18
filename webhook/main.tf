@@ -297,7 +297,7 @@ data "aws_iam_policy_document" "sns_topic_policy" {
     condition {
       test     = "StringLike"
       variable = "aws:PrincipalArn"
-      values   = ["arn:aws:iam::*:role/infraweave_api_role-${var.region}-${var.infraweave_env}"]
+      values   = ["arn:aws:iam::*:role/infraweave_api_role-${var.infraweave_env}"]
     }
   }
 }

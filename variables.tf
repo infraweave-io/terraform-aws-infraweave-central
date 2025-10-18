@@ -58,3 +58,10 @@ variable "terraform_state_additional_role_arns" {
     "arn:aws:iam::*:role/*AWSReservedSSO_AdministratorAccess_*",
   ]
 }
+
+variable "is_primary_region" {
+  type        = bool
+  default     = false
+  description = "Whether this region is the primary region for global resources such as roles and OIDC provider"
+}
+
