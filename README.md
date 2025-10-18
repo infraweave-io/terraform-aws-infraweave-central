@@ -20,6 +20,7 @@ Alpha version, expect changes to happen
 | <a name="input_environment"></a> [environment](#input\_environment) | Environment for InfraWeave, e.g. dev, test, prod | `string` | n/a | yes |
 | <a name="input_oidc_allowed_github_repos"></a> [oidc\_allowed\_github\_repos](#input\_oidc\_allowed\_github\_repos) | List of allowed GitHub repositories in format ["SomeOrg/repo", "AnotherOrg/another-repo"] for access to the platform | `list(string)` | `[]` | no |
 | <a name="input_region"></a> [region](#input\_region) | AWS region | `string` | n/a | yes |
+| <a name="input_terraform_state_additional_role_arns"></a> [terraform\_state\_additional\_role\_arns](#input\_terraform\_state\_additional\_role\_arns) | Additional IAM role ARN patterns to allow access to the Terraform state bucket of its own account id within the same organization | `list(string)` | <pre>[<br/>  "arn:aws:iam::*:role/*AWSReservedSSO_AdministratorAccess_*"<br/>]</pre> | no |
 
 ## Outputs
 

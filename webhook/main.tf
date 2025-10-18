@@ -2,7 +2,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.77.0"
+      version = "~> 6.0"
     }
   }
 }
@@ -114,6 +114,8 @@ resource "aws_ssm_parameter" "github_webhook_secret" {
   lifecycle {
     ignore_changes = [value]
   }
+
+  region = var.region
 }
 
 resource "aws_ssm_parameter" "github_webhook_private_key" {
@@ -126,6 +128,8 @@ resource "aws_ssm_parameter" "github_webhook_private_key" {
   lifecycle {
     ignore_changes = [value]
   }
+
+  region = var.region
 }
 
 resource "aws_dynamodb_table_item" "config" {
@@ -133,6 +137,8 @@ resource "aws_dynamodb_table_item" "config" {
   hash_key   = "PK"
   range_key  = "SK"
   item       = jsonencode(local.transformed_project_map)
+
+  region = var.region
 }
 
 resource "aws_lambda_function" "validator_github_webhook_handler" {
@@ -156,6 +162,8 @@ resource "aws_lambda_function" "validator_github_webhook_handler" {
       LOG_LEVEL                         = "info"
     }
   }
+
+  region = var.region
 }
 
 ### PROCESSOR
@@ -243,21 +251,29 @@ resource "aws_lambda_function" "processor_github_webhook_handler" {
       GITHUB_PRIVATE_KEY_PARAMETER_STORE_KEY = aws_ssm_parameter.github_webhook_private_key.name
     }
   }
+
+  region = var.region
 }
 
 resource "aws_sns_topic" "webhook_topic" {
   name = "infraweave-${var.infraweave_env}"
+
+  region = var.region
 }
 
 resource "aws_sqs_queue" "webhook_queue" {
   name                       = "infraweave-${var.infraweave_env}-webhook"
   visibility_timeout_seconds = 360
+
+  region = var.region
 }
 
 resource "aws_sns_topic_subscription" "webhook_subscription" {
   topic_arn = aws_sns_topic.webhook_topic.arn
   protocol  = "sqs"
   endpoint  = aws_sqs_queue.webhook_queue.arn
+
+  region = var.region
 }
 
 data "aws_iam_policy_document" "sns_topic_policy" {
@@ -289,6 +305,8 @@ data "aws_iam_policy_document" "sns_topic_policy" {
 resource "aws_sns_topic_policy" "webhook_topic_policy" {
   arn    = aws_sns_topic.webhook_topic.arn
   policy = data.aws_iam_policy_document.sns_topic_policy.json
+
+  region = var.region
 }
 
 data "aws_iam_policy_document" "sqs_policy" {
@@ -314,10 +332,14 @@ data "aws_iam_policy_document" "sqs_policy" {
 resource "aws_sqs_queue_policy" "webhook_queue_policy" {
   queue_url = aws_sqs_queue.webhook_queue.id
   policy    = data.aws_iam_policy_document.sqs_policy.json
+
+  region = var.region
 }
 
 resource "aws_lambda_event_source_mapping" "sqs_to_lambda" {
   event_source_arn = aws_sqs_queue.webhook_queue.arn
   function_name    = aws_lambda_function.processor_github_webhook_handler.arn
   batch_size       = 1 # number of messages per batch
+
+  region = var.region
 }

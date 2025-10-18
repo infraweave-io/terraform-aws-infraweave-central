@@ -37,6 +37,8 @@ resource "aws_lambda_function" "api" {
       NOTIFICATION_TOPIC_ARN             = var.notification_topic_arn
     }
   }
+
+  region = var.region
 }
 
 data "aws_iam_policy_document" "assume_role" {

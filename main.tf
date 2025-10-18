@@ -21,7 +21,7 @@ locals {
 
   notification_topic_arn = "arn:aws:sns:${var.region}:${local.central_account_id}:infraweave-${var.environment}"
 
-  image_version = "v0.0.85-arm64"
+  image_version = "v0.0.91-arm64"
 
   image             = "infraweave/gitops-aws:${local.image_version}"
   pull_through_ecr  = "infraweave-ecr-public"
@@ -48,7 +48,7 @@ module "webhook" {
 }
 
 module "oidc" {
-  count  = length(var.oidc_allowed_github_repos) > 0 ? 1 : 0
+  count  = length(var.oidc_allowed_github_repos) > 0 && var.create_github_oidc_provider ? 1 : 0
   source = "./oidc"
 
   infraweave_env              = var.environment
@@ -65,7 +65,7 @@ output "webhook_endpoint" {
 }
 
 output "oidc_role_arn" {
-  value = length(var.oidc_allowed_github_repos) > 0 ? module.oidc[0].oidc_role_arn : null
+  value = var.create_github_oidc_provider ? module.oidc[0].oidc_role_arn : null
 }
 
 module "api" {
@@ -130,11 +130,15 @@ resource "aws_dynamodb_table" "events" {
     Name = "EventsTable"
     # Environment = var.environment_tag
   }
+
+  region = var.region
 }
 
 resource "aws_kms_alias" "central_alias" {
   name          = "alias/infraweave-${var.environment}"
   target_key_id = aws_kms_key.central.key_id
+
+  region = var.region
 }
 
 resource "aws_kms_key" "central" {
@@ -245,12 +249,16 @@ resource "aws_dynamodb_resource_policy" "events" {
       },
     ]
   })
+
+  region = var.region
 }
 
 resource "aws_ssm_parameter" "dynamodb_events_table_name" {
   name  = "/infraweave/${var.region}/${var.environment}/dynamodb_events_table_name"
   type  = "String"
   value = resource.aws_dynamodb_table.events.name
+
+  region = var.region
 }
 
 resource "aws_dynamodb_table" "modules" {
@@ -284,6 +292,8 @@ resource "aws_dynamodb_table" "modules" {
     Name = "ModulesTable"
     # Environment = var.environment_tag
   }
+
+  region = var.region
 }
 
 resource "aws_dynamodb_resource_policy" "modules" {
@@ -340,12 +350,16 @@ resource "aws_dynamodb_resource_policy" "modules" {
       }
     ]
   })
+
+  region = var.region
 }
 
 resource "aws_ssm_parameter" "modules_table_name" {
   name  = "/infraweave/${var.region}/${var.environment}/modules_table_name"
   type  = "String"
   value = resource.aws_dynamodb_table.modules.name
+
+  region = var.region
 }
 
 resource "aws_dynamodb_table" "policies" {
@@ -379,6 +393,8 @@ resource "aws_dynamodb_table" "policies" {
     Name = "PoliciesTable"
     # Environment = var.environment_tag
   }
+
+  region = var.region
 }
 
 resource "aws_dynamodb_resource_policy" "policies" {
@@ -435,6 +451,8 @@ resource "aws_dynamodb_resource_policy" "policies" {
       }
     ]
   })
+
+  region = var.region
 }
 
 resource "aws_dynamodb_table" "change_records" {
@@ -468,6 +486,8 @@ resource "aws_dynamodb_table" "change_records" {
     Name = "ChangeRecordsTable"
     # Environment = var.environment_tag
   }
+
+  region = var.region
 }
 
 resource "aws_dynamodb_resource_policy" "change_records" {
@@ -505,6 +525,8 @@ resource "aws_dynamodb_resource_policy" "change_records" {
       }
     ]
   })
+
+  region = var.region
 }
 
 resource "aws_dynamodb_table" "deployments" {
@@ -602,6 +624,8 @@ resource "aws_dynamodb_table" "deployments" {
   tags = {
     Name = "DeploymentsTable"
   }
+
+  region = var.region
 }
 
 
@@ -725,6 +749,8 @@ resource "aws_dynamodb_resource_policy" "deployments" {
       }
     ]
   })
+
+  region = var.region
 }
 
 resource "aws_dynamodb_table" "config" {
@@ -751,6 +777,8 @@ resource "aws_dynamodb_table" "config" {
     enabled     = true
     kms_key_arn = aws_kms_key.central.arn
   }
+
+  region = var.region
 }
 
 resource "aws_dynamodb_table_item" "config" {
@@ -764,6 +792,8 @@ resource "aws_dynamodb_table_item" "config" {
       regions = { L = [for region in var.all_regions : { S = region }] }
     } }
   })
+
+  region = var.region
 }
 
 resource "aws_dynamodb_table_item" "all_projects" {
@@ -795,6 +825,8 @@ resource "aws_dynamodb_table_item" "all_projects" {
       } }]
     ) }
   })
+
+  region = var.region
 }
 
 resource "aws_dynamodb_resource_policy" "config" {
@@ -825,6 +857,8 @@ resource "aws_dynamodb_resource_policy" "config" {
       # TODO: Add deny statement here for modifying the table
     ]
   })
+
+  region = var.region
 }
 
 #trivy:ignore:aws-s3-enable-bucket-logging
@@ -838,6 +872,8 @@ resource "aws_s3_bucket" "modules_bucket" {
     Name        = "ModulesBucket"
     Environment = var.environment
   }
+
+  region = var.region
 }
 
 resource "aws_s3_bucket_versioning" "modules_bucket" {
@@ -845,6 +881,8 @@ resource "aws_s3_bucket_versioning" "modules_bucket" {
   versioning_configuration {
     status = "Enabled"
   }
+
+  region = var.region
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "modules" {
@@ -856,6 +894,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "modules" {
       kms_master_key_id = aws_kms_key.central.arn
     }
   }
+
+  region = var.region
 }
 
 resource "aws_s3_bucket_public_access_block" "modules_bucket" {
@@ -865,6 +905,8 @@ resource "aws_s3_bucket_public_access_block" "modules_bucket" {
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
+
+  region = var.region
 }
 
 resource "aws_s3_bucket_policy" "modules_bucket" {
@@ -921,6 +963,8 @@ resource "aws_s3_bucket_policy" "modules_bucket" {
       }
     ]
   })
+
+  region = var.region
 }
 
 #trivy:ignore:aws-s3-enable-bucket-logging
@@ -934,6 +978,8 @@ resource "aws_s3_bucket" "policies_bucket" {
     Name        = "PoliciesBucket"
     Environment = var.environment
   }
+
+  region = var.region
 }
 
 resource "aws_s3_bucket_versioning" "policies_bucket" {
@@ -941,6 +987,8 @@ resource "aws_s3_bucket_versioning" "policies_bucket" {
   versioning_configuration {
     status = "Enabled"
   }
+
+  region = var.region
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "policies" {
@@ -952,6 +1000,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "policies" {
       kms_master_key_id = aws_kms_key.central.arn
     }
   }
+
+  region = var.region
 }
 
 resource "aws_s3_bucket_public_access_block" "policies_bucket" {
@@ -961,6 +1011,8 @@ resource "aws_s3_bucket_public_access_block" "policies_bucket" {
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
+
+  region = var.region
 }
 
 resource "aws_s3_bucket_policy" "policies_bucket" {
@@ -1017,6 +1069,8 @@ resource "aws_s3_bucket_policy" "policies_bucket" {
       }
     ]
   })
+
+  region = var.region
 }
 
 #trivy:ignore:aws-s3-enable-bucket-logging
@@ -1030,6 +1084,8 @@ resource "aws_s3_bucket" "change_records_bucket" {
     Name        = "ChangeRecordsBucket"
     Environment = var.environment
   }
+
+  region = var.region
 }
 
 resource "aws_s3_bucket_versioning" "change_records_bucket" {
@@ -1037,6 +1093,8 @@ resource "aws_s3_bucket_versioning" "change_records_bucket" {
   versioning_configuration {
     status = "Enabled"
   }
+
+  region = var.region
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "change_records" {
@@ -1048,6 +1106,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "change_records" {
       kms_master_key_id = aws_kms_key.central.arn
     }
   }
+
+  region = var.region
 }
 
 resource "aws_s3_bucket_public_access_block" "change_records_bucket" {
@@ -1057,6 +1117,8 @@ resource "aws_s3_bucket_public_access_block" "change_records_bucket" {
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
+
+  region = var.region
 }
 
 resource "aws_s3_bucket_policy" "change_records_bucket" {
@@ -1089,24 +1151,32 @@ resource "aws_s3_bucket_policy" "change_records_bucket" {
       }
     ]
   })
+
+  region = var.region
 }
 
 resource "aws_ssm_parameter" "modules_bucket" {
   name  = "/infraweave/${var.region}/${var.environment}/modules_bucket"
   type  = "String"
   value = resource.aws_s3_bucket.modules_bucket.bucket
+
+  region = var.region
 }
 
 resource "aws_ssm_parameter" "policies_bucket" {
   name  = "/infraweave/${var.region}/${var.environment}/policies_bucket"
   type  = "String"
   value = resource.aws_s3_bucket.policies_bucket.bucket
+
+  region = var.region
 }
 
 resource "aws_ssm_parameter" "change_records_bucket" {
   name  = "/infraweave/${var.region}/${var.environment}/change_records_bucket"
   type  = "String"
   value = resource.aws_s3_bucket.change_records_bucket.bucket
+
+  region = var.region
 }
 
 data "aws_caller_identity" "current" {}
@@ -1138,6 +1208,8 @@ resource "aws_s3_bucket" "terraform_state" {
     # Environment = var.environment
     # Region      = var.region
   }
+
+  region = var.region
 }
 
 resource "aws_s3_bucket_versioning" "terraform_state" {
@@ -1145,6 +1217,8 @@ resource "aws_s3_bucket_versioning" "terraform_state" {
   versioning_configuration {
     status = "Enabled"
   }
+
+  region = var.region
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "terraform_state" {
@@ -1156,6 +1230,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "terraform_state" 
       kms_master_key_id = aws_kms_key.central.arn
     }
   }
+
+  region = var.region
 }
 
 resource "aws_s3_bucket_public_access_block" "terraform_state" {
@@ -1165,6 +1241,8 @@ resource "aws_s3_bucket_public_access_block" "terraform_state" {
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
+
+  region = var.region
 }
 
 resource "aws_s3_bucket_policy" "terraform_state" {
@@ -1215,6 +1293,8 @@ resource "aws_s3_bucket_policy" "terraform_state" {
       }
     ]
   })
+
+  region = var.region
 }
 
 resource "aws_s3_bucket_versioning" "versioning_example" {
@@ -1222,6 +1302,8 @@ resource "aws_s3_bucket_versioning" "versioning_example" {
   versioning_configuration {
     status = "Enabled"
   }
+
+  region = var.region
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "example" {
@@ -1233,6 +1315,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "example" {
       kms_master_key_id = aws_kms_key.central.arn
     }
   }
+
+  region = var.region
 }
 
 #trivy:ignore:aws-s3-enable-bucket-logging
@@ -1244,6 +1328,8 @@ resource "aws_s3_bucket" "providers_bucket" {
   tags = {
     Name = "TerraformProvidersBucket"
   }
+
+  region = var.region
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "it_default" {
@@ -1260,6 +1346,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "it_default" {
       storage_class = "INTELLIGENT_TIERING"
     }
   }
+
+  region = var.region
 }
 
 resource "aws_s3_bucket_versioning" "providers_bucket" {
@@ -1267,6 +1355,8 @@ resource "aws_s3_bucket_versioning" "providers_bucket" {
   versioning_configuration {
     status = "Enabled"
   }
+
+  region = var.region
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "providers_bucket" {
@@ -1278,6 +1368,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "providers_bucket"
       kms_master_key_id = aws_kms_key.central.arn
     }
   }
+
+  region = var.region
 }
 
 resource "aws_s3_bucket_public_access_block" "providers_bucket" {
@@ -1287,6 +1379,8 @@ resource "aws_s3_bucket_public_access_block" "providers_bucket" {
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
+
+  region = var.region
 }
 
 resource "aws_s3_bucket_policy" "providers_bucket" {
@@ -1341,6 +1435,8 @@ resource "aws_s3_bucket_policy" "providers_bucket" {
       }
     ]
   })
+
+  region = var.region
 }
 
 resource "aws_dynamodb_table" "terraform_locks" {
@@ -1370,6 +1466,8 @@ resource "aws_dynamodb_table" "terraform_locks" {
     Name = "TerraformStateLocks"
     # Environment = var.environment_tag
   }
+
+  region = var.region
 }
 
 
@@ -1408,4 +1506,6 @@ resource "aws_dynamodb_resource_policy" "terraform_locks" {
       }
     ]
   })
+
+  region = var.region
 }

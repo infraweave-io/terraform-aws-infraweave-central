@@ -3,7 +3,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.77.0"
+      version = "~> 6.0"
     }
   }
 }
@@ -15,6 +15,8 @@ data "aws_region" "current" {}
 resource "aws_apigatewayv2_api" "http_api" {
   name          = "github-webhook-api-${var.infraweave_env}"
   protocol_type = "HTTP"
+
+  region = var.region
 }
 
 resource "aws_apigatewayv2_integration" "lambda_integration" {
@@ -22,24 +24,32 @@ resource "aws_apigatewayv2_integration" "lambda_integration" {
   integration_type       = "AWS_PROXY"
   integration_uri        = var.validator_lambda_invoke_arn
   payload_format_version = "2.0"
+
+  region = var.region
 }
 
 resource "aws_apigatewayv2_route" "default_route" {
   api_id    = aws_apigatewayv2_api.http_api.id
   route_key = "POST /webhook"
   target    = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
+
+  region = var.region
 }
 
 resource "aws_apigatewayv2_deployment" "api_deployment" {
   api_id = aws_apigatewayv2_api.http_api.id
 
   depends_on = [aws_apigatewayv2_route.default_route]
+
+  region = var.region
 }
 
 resource "aws_apigatewayv2_stage" "api_stage" {
   api_id      = aws_apigatewayv2_api.http_api.id
   name        = "$default"
   auto_deploy = true
+
+  region = var.region
 }
 
 resource "aws_lambda_permission" "apigw_lambda" {
@@ -48,4 +58,6 @@ resource "aws_lambda_permission" "apigw_lambda" {
   function_name = var.validator_lambda_function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.http_api.execution_arn}/$default/POST/webhook"
+
+  region = var.region
 }
