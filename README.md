@@ -21,7 +21,7 @@ Alpha version, expect changes to happen
 | <a name="input_is_primary_region"></a> [is\_primary\_region](#input\_is\_primary\_region) | Whether this region is the primary region for global resources such as roles and OIDC provider | `bool` | `false` | no |
 | <a name="input_oidc_allowed_github_repos"></a> [oidc\_allowed\_github\_repos](#input\_oidc\_allowed\_github\_repos) | List of allowed GitHub repositories in format ["SomeOrg/repo", "AnotherOrg/another-repo"] for access to the platform | `list(string)` | `[]` | no |
 | <a name="input_region"></a> [region](#input\_region) | AWS region | `string` | n/a | yes |
-| <a name="input_terraform_state_additional_role_arns"></a> [terraform\_state\_additional\_role\_arns](#input\_terraform\_state\_additional\_role\_arns) | Additional IAM role ARN patterns to allow access to the Terraform state bucket of its own account id within the same organization | `list(string)` | <pre>[<br/>  "arn:aws:iam::*:role/*AWSReservedSSO_AdministratorAccess_*"<br/>]</pre> | no |
+| <a name="input_terraform_state_additional_role_arns"></a> [terraform\_state\_additional\_role\_arns](#input\_terraform\_state\_additional\_role\_arns) | Additional IAM role ARN patterns to allow access to the Terraform state bucket of its own account id within the same organization | `list(string)` | <pre>[<br/>  "arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/*/AWSReservedSSO_AdministratorAccess_*"<br/>]</pre> | no |
 
 ## Outputs
 
