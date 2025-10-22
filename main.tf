@@ -21,7 +21,7 @@ locals {
 
   notification_topic_arn = "arn:aws:sns:${var.region}:${local.central_account_id}:infraweave-${var.environment}"
 
-  image_version = "v0.0.92-arm64"
+  image_version = "v0.0.94-rc.1-arm64"
 
   image             = "infraweave/gitops-aws:${local.image_version}"
   pull_through_ecr  = "infraweave-ecr-public"
@@ -164,7 +164,6 @@ resource "aws_kms_key" "central" {
         Sid    = "Allow Lambda usage",
         Effect = "Allow",
         Principal = {
-          # Replace with the ARN of the IAM role assumed by your Lambda functions
           AWS = "*"
         },
         Condition = {
@@ -202,8 +201,6 @@ resource "aws_dynamodb_resource_policy" "events" {
         Action = [
           "dynamodb:PutItem",
           "dynamodb:GetItem",
-          # "dynamodb:DeleteItem",
-          # "dynamodb:UpdateItem",
           "dynamodb:Query",
         ],
         Resource  = aws_dynamodb_table.events.arn,
@@ -225,10 +222,7 @@ resource "aws_dynamodb_resource_policy" "events" {
       {
         Effect = "Allow",
         Action = [
-          # "dynamodb:PutItem",
           "dynamodb:GetItem",
-          # "dynamodb:DeleteItem",
-          # "dynamodb:UpdateItem",
           "dynamodb:Query",
         ],
         Resource = [
@@ -308,8 +302,6 @@ resource "aws_dynamodb_resource_policy" "modules" {
         Action = [
           "dynamodb:PutItem",
           "dynamodb:GetItem",
-          # "dynamodb:DeleteItem",
-          # "dynamodb:UpdateItem",
           "dynamodb:Query",
         ],
         Resource  = aws_dynamodb_table.modules.arn,
@@ -329,10 +321,7 @@ resource "aws_dynamodb_resource_policy" "modules" {
       {
         Effect = "Allow",
         Action = [
-          # "dynamodb:PutItem",
           "dynamodb:GetItem",
-          # "dynamodb:DeleteItem",
-          # "dynamodb:UpdateItem",
           "dynamodb:Query",
         ],
         Resource  = aws_dynamodb_table.modules.arn,
@@ -409,8 +398,6 @@ resource "aws_dynamodb_resource_policy" "policies" {
         Action = [
           "dynamodb:PutItem",
           "dynamodb:GetItem",
-          # "dynamodb:DeleteItem",
-          # "dynamodb:UpdateItem",
           "dynamodb:Query",
         ],
         Resource  = aws_dynamodb_table.policies.arn,
@@ -430,10 +417,7 @@ resource "aws_dynamodb_resource_policy" "policies" {
       {
         Effect = "Allow",
         Action = [
-          # "dynamodb:PutItem",
           "dynamodb:GetItem",
-          # "dynamodb:DeleteItem",
-          # "dynamodb:UpdateItem",
           "dynamodb:Query",
         ],
         Resource  = aws_dynamodb_table.policies.arn,
@@ -680,10 +664,7 @@ resource "aws_dynamodb_resource_policy" "deployments" {
         Sid    = "CentralFullReadAccess",
         Effect = "Allow",
         Action = [
-          # "dynamodb:PutItem",
           "dynamodb:GetItem",
-          # "dynamodb:DeleteItem",
-          # "dynamodb:UpdateItem",
           "dynamodb:Query",
         ],
         Resource = [
@@ -721,7 +702,6 @@ resource "aws_dynamodb_resource_policy" "deployments" {
         Action = [
           "dynamodb:PutItem",
           "dynamodb:GetItem",
-          # "dynamodb:DeleteItem",
           "dynamodb:UpdateItem",
           "dynamodb:Query",
         ],
@@ -922,8 +902,6 @@ resource "aws_s3_bucket_policy" "modules_bucket" {
         Principal = "*",
         Action = [
           "s3:GetObject",
-          # "s3:PutObject",
-          # "s3:DeleteObject",
           "s3:ListBucket"
         ],
         Resource = [
@@ -946,7 +924,6 @@ resource "aws_s3_bucket_policy" "modules_bucket" {
         Action = [
           "s3:GetObject",
           "s3:PutObject",
-          # "s3:DeleteObject",
           "s3:ListBucket"
         ],
         Resource = [
@@ -1028,8 +1005,6 @@ resource "aws_s3_bucket_policy" "policies_bucket" {
         Principal = "*",
         Action = [
           "s3:GetObject",
-          # "s3:PutObject",
-          # "s3:DeleteObject",
           "s3:ListBucket"
         ],
         Resource = [
@@ -1052,7 +1027,6 @@ resource "aws_s3_bucket_policy" "policies_bucket" {
         Action = [
           "s3:GetObject",
           "s3:PutObject",
-          # "s3:DeleteObject",
           "s3:ListBucket"
         ],
         Resource = [
@@ -1182,22 +1156,6 @@ resource "aws_ssm_parameter" "change_records_bucket" {
 
 data "aws_caller_identity" "current" {}
 
-# NOTE: Currently requires authenticated access to the registry
-
-# resource "aws_ecr_repository" "pull_through_ecr" {
-#   name = "infraweave"
-
-#   image_tag_mutability = "MUTABLE"
-#   image_scanning_configuration {
-#     scan_on_push = true
-#   }
-# }
-
-# resource "aws_ecr_pull_through_cache_rule" "rule" {
-#   ecr_repository_prefix = "infraweave-io"
-#   upstream_registry_url = "ghcr.io"
-# }
-
 #trivy:ignore:aws-s3-enable-bucket-logging
 resource "aws_s3_bucket" "terraform_state" {
   bucket = local.bucket_names.tf_state
@@ -1277,7 +1235,6 @@ resource "aws_s3_bucket_policy" "terraform_state" {
         Action = [
           "s3:GetObject",
           "s3:PutObject",
-          # "s3:DeleteObject"
         ],
         Resource = "${aws_s3_bucket.terraform_state.arn}/$${aws:PrincipalAccount}/*",
         Condition = {
@@ -1419,7 +1376,6 @@ resource "aws_s3_bucket_policy" "providers_bucket" {
           "s3:GetObject",
           "s3:ListBucket",
           "s3:PutObject",
-          # "s3:DeleteObject",
         ],
         Resource = [
           "${aws_s3_bucket.providers_bucket.arn}",  # Bucket-level actions
