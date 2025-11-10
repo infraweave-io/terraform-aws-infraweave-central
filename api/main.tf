@@ -238,7 +238,7 @@ data "aws_iam_policy_document" "lambda_policy_document" {
       "sts:AssumeRole",
     ]
     resources = [
-      "arn:aws:iam::*:role/infraweave_api_read_log-${var.region}-${var.environment}"
+      "arn:aws:iam::*:role/infraweave_api_read_log-${var.environment}"
     ]
   }
 }
