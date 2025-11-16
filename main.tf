@@ -188,6 +188,8 @@ resource "aws_kms_key" "central" {
       }
     ]
   })
+
+  region = var.region
 }
 
 resource "aws_dynamodb_resource_policy" "events" {
