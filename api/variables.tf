@@ -62,3 +62,26 @@ variable "is_primary_region" {
   type = bool
 }
 
+variable "user_pool_id" {
+  type        = string
+  description = "The ID of the Cognito User Pool"
+  default     = ""
+}
+
+variable "cognito_domain" {
+  type        = string
+  description = "The Cognito domain (e.g., your-domain.auth.us-west-2.amazoncognito.com)"
+  default     = ""
+}
+
+variable "cognito_client_id" {
+  type        = string
+  description = "The Cognito User Pool Client ID"
+  default     = ""
+}
+
+variable "ecs_cluster" {
+  type        = string
+  description = "The ECS cluster name"
+  default     = ""
+}

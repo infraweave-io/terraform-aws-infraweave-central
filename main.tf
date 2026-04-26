@@ -2,6 +2,8 @@ locals {
   central_account_id = data.aws_caller_identity.current.account_id
   organization_id    = data.aws_organizations_organization.current_org.id
 
+  resolved_auth_config = var.auth_config
+
   dynamodb_table_names = {
     events         = "Events-${local.central_account_id}-${var.region}-${var.environment}",
     modules        = "Modules-${local.central_account_id}-${var.region}-${var.environment}",
@@ -87,7 +89,46 @@ module "api" {
   central_account_id        = local.central_account_id
   notification_topic_arn    = local.notification_topic_arn
   is_primary_region         = var.is_primary_region
+
+  user_pool_id      = try(local.resolved_auth_config.user_pool_id, "")
+  cognito_client_id = try(local.resolved_auth_config.client_id, "")
+  cognito_domain    = try(local.resolved_auth_config.issuer_url, "")
+  ecs_cluster       = "terraform-ecs-cluster-${var.environment}"
 }
+
+module "api_gw" {
+  source = "./api-gateway"
+
+  count = var.enable_api_gw ? 1 : 0
+
+  environment               = var.environment
+  region                    = var.region
+  account_id                = local.central_account_id
+  events_table_name         = resource.aws_dynamodb_table.events.name
+  modules_table_name        = resource.aws_dynamodb_table.modules.name
+  deployments_table_name    = resource.aws_dynamodb_table.deployments.name
+  policies_table_name       = resource.aws_dynamodb_table.policies.name
+  change_records_table_name = resource.aws_dynamodb_table.change_records.name
+  config_table_name         = resource.aws_dynamodb_table.config.name
+  modules_s3_bucket         = resource.aws_s3_bucket.modules_bucket.bucket
+  policies_s3_bucket        = resource.aws_s3_bucket.policies_bucket.bucket
+  change_records_s3_bucket  = resource.aws_s3_bucket.change_records_bucket.bucket
+  providers_s3_bucket       = resource.aws_s3_bucket.providers_bucket.bucket
+  central_account_id        = local.central_account_id
+  notification_topic_arn    = local.notification_topic_arn
+
+  api_lambda_function_name = module.api.webserver_function_name
+
+  auth_issuer_url = local.resolved_auth_config.issuer_url
+  auth_client_id  = local.resolved_auth_config.client_id
+  auth_domain     = coalesce(local.resolved_auth_config.domain, "")
+
+  cors_allow_origins = var.cors_allow_origins
+
+  enable_waf            = var.enable_waf
+  waf_rate_limit_per_ip = var.waf_rate_limit_per_ip
+}
+
 
 resource "aws_dynamodb_table" "events" {
   name         = local.dynamodb_table_names.events
@@ -506,6 +547,7 @@ resource "aws_dynamodb_resource_policy" "change_records" {
               "DESTROY#$${aws:PrincipalAccount}::${var.region}*",
               "APPLY#$${aws:PrincipalAccount}::${var.region}*",
               "PLAN#$${aws:PrincipalAccount}::${var.region}*",
+              "MUTATE#$${aws:PrincipalAccount}::${var.region}*",
             ]
           }
         }
@@ -659,6 +701,33 @@ resource "aws_dynamodb_resource_policy" "deployments" {
               "PROJECT#$${aws:PrincipalAccount}",
               "PROJECTS", // Allow listing all projects (TODO: review this if it's a good idea)
             ]
+          }
+        }
+      },
+      {
+        Sid    = "AllowCentralAccountFullWriteAccess",
+        Effect = "Allow",
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:GetItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:Query",
+        ],
+        Resource = [
+          aws_dynamodb_table.deployments.arn,
+          "${aws_dynamodb_table.deployments.arn}/index/DeletedIndex",
+          "${aws_dynamodb_table.deployments.arn}/index/ModuleIndex",
+          "${aws_dynamodb_table.deployments.arn}/index/DriftCheckIndex",
+          "${aws_dynamodb_table.deployments.arn}/index/ReverseIndex",
+        ],
+        Principal = "*",
+        Condition = {
+          StringEquals = {
+            "aws:PrincipalAccount" = local.central_account_id
+          },
+          ArnLike = {
+            "aws:PrincipalArn" = "arn:aws:iam::${local.central_account_id}:role/infraweave_api_role-${var.environment}"
           }
         }
       },
