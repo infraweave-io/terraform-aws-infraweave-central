@@ -1478,7 +1478,7 @@ locals {
 }
 
 resource "aws_oam_sink" "central" {
-  count = var.enable_observability && var.is_primary_region ? 1 : 0
+  count = var.enable_observability ? 1 : 0
 
   name = "infraweave-observability-sink-${var.environment}"
 
@@ -1491,7 +1491,7 @@ resource "aws_oam_sink" "central" {
 }
 
 resource "aws_oam_sink_policy" "central" {
-  count = var.enable_observability && var.is_primary_region ? 1 : 0
+  count = var.enable_observability ? 1 : 0
 
   sink_identifier = aws_oam_sink.central[0].id
 
@@ -1624,10 +1624,10 @@ resource "aws_cloudwatch_dashboard" "observability" {
 
 output "observability_sink_arn" {
   description = "ARN of the CloudWatch Observability Access Manager sink"
-  value       = var.enable_observability && var.is_primary_region ? aws_oam_sink.central[0].arn : null
+  value       = var.enable_observability ? aws_oam_sink.central[0].arn : null
 }
 
 output "observability_sink_id" {
   description = "ID of the CloudWatch Observability Access Manager sink"
-  value       = var.enable_observability && var.is_primary_region ? aws_oam_sink.central[0].id : null
+  value       = var.enable_observability ? aws_oam_sink.central[0].id : null
 }
