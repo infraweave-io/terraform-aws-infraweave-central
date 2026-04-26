@@ -65,3 +65,10 @@ variable "is_primary_region" {
   description = "Whether this region is the primary region for global resources such as roles and OIDC provider"
 }
 
+variable "enable_observability" {
+  type        = bool
+  default     = true
+  description = "Enable CloudWatch cross-account observability with OAM sink and dashboard"
+}
+
+

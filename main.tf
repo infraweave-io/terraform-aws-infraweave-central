@@ -1468,3 +1468,166 @@ resource "aws_dynamodb_resource_policy" "terraform_locks" {
 
   region = var.region
 }
+
+# CloudWatch Observability Access Manager (OAM) Sink
+locals {
+  # Extract workload account IDs from all_workload_projects if workload_account_ids is not provided
+  workload_account_ids = length(var.workload_account_ids) > 0 ? var.workload_account_ids : [
+    for project in var.all_workload_projects : project.project_id
+  ]
+}
+
+resource "aws_oam_sink" "central" {
+  count = var.enable_observability && var.is_primary_region ? 1 : 0
+
+  name = "infraweave-observability-sink-${var.environment}"
+
+  tags = {
+    Name        = "InfraWeave Observability Sink"
+    Environment = var.environment
+  }
+
+  region = var.region
+}
+
+resource "aws_oam_sink_policy" "central" {
+  count = var.enable_observability && var.is_primary_region ? 1 : 0
+
+  sink_identifier = aws_oam_sink.central[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          AWS = [for account_id in local.workload_account_ids : "arn:aws:iam::${account_id}:root"]
+        }
+        Action = [
+          "oam:CreateLink",
+          "oam:UpdateLink"
+        ]
+        Resource = "*"
+        Condition = {
+          "ForAllValues:StringEquals" = {
+            "oam:ResourceTypes" = [
+              "AWS::CloudWatch::Metric",
+              "AWS::Logs::LogGroup",
+              "AWS::XRay::Trace"
+            ]
+          }
+        }
+      }
+    ]
+  })
+
+  region = var.region
+}
+
+# CloudWatch Dashboard for cross-account observability
+resource "aws_cloudwatch_dashboard" "observability" {
+  count = var.enable_observability && var.is_primary_region ? 1 : 0
+
+  dashboard_name = "infraweave-observability-${var.environment}"
+
+  dashboard_body = jsonencode({
+    widgets = concat(
+      # Lambda Invocations widget - per region
+      [for idx, region in var.all_regions : {
+        type = "metric"
+        properties = {
+          metrics = [
+            [{ expression = "SEARCH('{AWS/Lambda,FunctionName} MetricName=\"Invocations\"', 'Sum', 300)", id = "invocations", region = region }]
+          ]
+          view    = "timeSeries"
+          stacked = false
+          region  = region
+          title   = "Lambda Invocations - ${region} (All Accounts)"
+          period  = 300
+          yAxis = {
+            left = {
+              min = 0
+            }
+          }
+        }
+        width  = 12
+        height = 6
+        x      = (idx % 2) * 12
+        y      = 0 + floor(idx / 2) * 6
+      }],
+      # Lambda Errors widget - per region
+      [for idx, region in var.all_regions : {
+        type = "metric"
+        properties = {
+          metrics = [
+            [{ expression = "SEARCH('{AWS/Lambda,FunctionName} MetricName=\"Errors\"', 'Sum', 300)", id = "errors", region = region }]
+          ]
+          view    = "timeSeries"
+          stacked = false
+          region  = region
+          title   = "Lambda Errors - ${region} (All Accounts)"
+          period  = 300
+          yAxis = {
+            left = {
+              min = 0
+            }
+          }
+        }
+        width  = 12
+        height = 6
+        x      = (idx % 2) * 12
+        y      = ceil(length(var.all_regions) / 2.0) * 6 + floor(idx / 2) * 6
+      }],
+      # Lambda Duration widgets - one per region
+      [for idx, region in var.all_regions : {
+        type = "metric"
+        properties = {
+          metrics = [
+            [{ expression = "SEARCH('{AWS/Lambda,FunctionName} MetricName=\"Duration\"', 'Average', 300)", id = "avg_duration", region = region, label = "Average" }],
+            [{ expression = "SEARCH('{AWS/Lambda,FunctionName} MetricName=\"Duration\"', 'p99', 300)", id = "p99_duration", region = region, label = "P99" }]
+          ]
+          view    = "timeSeries"
+          stacked = false
+          region  = region
+          title   = "Lambda Duration - ${region} (All Accounts)"
+          period  = 300
+          yAxis = {
+            left = {
+              min = 0
+            }
+          }
+        }
+        width  = 12
+        height = 6
+        x      = (idx % 2) * 12
+        y      = ceil(length(var.all_regions) / 2.0) * 12 + floor(idx / 2) * 6
+      }],
+      # Recent Lambda Errors log widget
+      [{
+        type = "log"
+        properties = {
+          query   = "SOURCE '/aws/lambda/infraweave-api-${var.environment}' | fields @timestamp, @message, @logStream | filter @message like /ERROR/ or @message like /Error/ | sort @timestamp desc | limit 20"
+          region  = var.region
+          title   = "Recent Lambda Errors (Primary Region)"
+          stacked = false
+        }
+        width  = 24
+        height = 6
+        x      = 0
+        y      = ceil(length(var.all_regions) / 2.0) * 18
+      }]
+    )
+  })
+
+  region = var.region
+}
+
+output "observability_sink_arn" {
+  description = "ARN of the CloudWatch Observability Access Manager sink"
+  value       = var.enable_observability && var.is_primary_region ? aws_oam_sink.central[0].arn : null
+}
+
+output "observability_sink_id" {
+  description = "ID of the CloudWatch Observability Access Manager sink"
+  value       = var.enable_observability && var.is_primary_region ? aws_oam_sink.central[0].id : null
+}

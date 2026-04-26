@@ -265,8 +265,22 @@ resource "aws_iam_role_policy_attachment" "lambda_policy_attachment" {
   policy_arn = aws_iam_policy.lambda_policy[0].arn
 }
 
+resource "aws_iam_role_policy_attachment" "lambda_xray_policy" {
+  count = var.is_primary_region ? 1 : 0
+
+  role       = aws_iam_role.iam_for_lambda[0].name
+  policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
+}
+
 data "archive_file" "lambda" {
   type        = "zip"
   source_file = "${path.module}/lambda.py"
   output_path = "${path.module}/lambda_function_payload.zip"
+}
+
+resource "aws_iam_role_policy_attachment" "cloudwatch_otlp" {
+  count = var.is_primary_region ? 1 : 0
+  
+  role       = aws_iam_role.iam_for_lambda[0].name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
 }
